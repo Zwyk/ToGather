@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Directions demo</title>
+  <style>
+    /* Basic layout */
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    #controls {
+      padding: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      z-index: 1;
+      background: white;
+      position: relative;
+    }
+    #controls input {
+      padding: 6px 8px;
+      min-width: 220px;
+    }
+    #controls button {
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    #map {
+      height: calc(100% - 52px); /* full height minus controls */
+    }
+    #error {
+      color: #b00020;
+      margin-left: 8px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls" style="display:flex; flex-wrap:wrap; gap:12px; padding:8px;">
+    <div style="display:flex; flex-direction:column; gap:4px; min-width:220px;">
+      <label>
+        Person 1:
+        <input id="addr1" type="text" placeholder="Person 1 address" value="10 rue Daniel Hirtz Strasbourg" />
+      </label>
+      <label>
+        Mode 1:
+        <select id="mode1">
+          <option value="DRIVING" selected>Driving</option>
+          <option value="WALKING">Walking</option>
+          <option value="BICYCLING">Bicycling</option>
+          <option value="TRANSIT">Transit</option>
+        </select>
+      </label>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:4px; min-width:220px;">
+      <label>
+        Person 2:
+        <input id="addr2" type="text" placeholder="Person 2 address" value="3 place henri dunant strasbourg" />
+      </label>
+      <label>
+        Mode 2:
+        <select id="mode2">
+          <option value="DRIVING" selected>Driving</option>
+          <option value="WALKING">Walking</option>
+          <option value="BICYCLING">Bicycling</option>
+          <option value="TRANSIT">Transit</option>
+        </select>
+      </label>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:4px; min-width:260px;">
+      <label>
+        Meeting point (where they meet):
+        <input id="meeting" type="text" placeholder="Click on map or type an address" />
+      </label>
+      <small>Click on the map to set the meeting point, or type an address here.</small>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:4px; min-width:260px;">
+      <label>
+        Destination (final place they go together):
+        <input id="destination" type="text" placeholder="Final destination address" value="Hueco zénith eckbolsheim" />
+      </label>
+      <small>Used by “Optimize meeting point” and comparisons.</small>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:4px;">
+      <button id="optBtn">Optimize meeting point</button>
+      <button id="routeBtn">Show routes</button>
+      <span id="error" style="color:#b00020; margin-top:4px;"></span>
+    </div>
+  </div>
+
+  <div id="info" style="padding: 8px 12px; font-size: 0.9em; white-space: pre-line;"></div>
+
+  <div id="map" style="height: calc(100vh - 120px);"></div>
+
+  <!-- API key in config.js (window.GOOGLE_MAPS_API_KEY) -->
+  <script src="config.js"></script>
+
+  <!-- Load Google Maps + Places -->
+  <script>
+    function loadGoogleMaps() {
+      const key = window.GOOGLE_MAPS_API_KEY;
+      if (!key) {
+        console.error("Google Maps API key missing in config.js");
+        return;
+      }
+      const script = document.createElement("script");
+      script.src =
+        "https://maps.googleapis.com/maps/api/js?key=" +
+        key +
+        "&callback=initMap&loading=async&libraries=places";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+    loadGoogleMaps();
+  </script>
+
+  <!-- Main logic -->
+  <script>
+    let map;
+    let directionsService;
+    let renderer1;
+    let renderer2;
+    let rendererDest; // Meeting -> Destination
+
+    let meetingLatLng = null;
+    let meetingMarker = null;
+
+    const SPEEDS_KMH = {
+      DRIVING: 50,
+      WALKING: 5,
+      BICYCLING: 15,
+      TRANSIT: 25,
+    };
+
+    function routePromise(request) {
+      return new Promise((resolve, reject) => {
+        directionsService.route(request, (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK) {
+            resolve(result);
+          } else {
+            reject(status);
+          }
+        });
+      });
+    }
+
+    function samplePath(path, num) {
+      const candidates = [];
+      if (!path || path.length < 2 || num <= 0) return candidates;
+
+      if (path.length <= num + 2) {
+        for (let i = 1; i < path.length - 1; i++) {
+          candidates.push(path[i]);
+        }
+      } else {
+        const step = Math.floor(path.length / (num + 1));
+        for (let i = 1; i <= num; i++) {
+          const idx = i * step;
+          if (idx > 0 && idx < path.length - 1) {
+            candidates.push(path[idx]);
+          }
+        }
+      }
+      return candidates;
+    }
+
+    function initMap() {
+      map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 6,
+        center: { lat: 46.5, lng: 2.5 },
+      });
+
+      directionsService = new google.maps.DirectionsService();
+
+      renderer1 = new google.maps.DirectionsRenderer({
+        map: map,
+        polylineOptions: { strokeColor: "#1a73e8" }, // Person 1
+      });
+
+      renderer2 = new google.maps.DirectionsRenderer({
+        map: map,
+        polylineOptions: { strokeColor: "#e91e63" }, // Person 2
+      });
+
+      rendererDest = new google.maps.DirectionsRenderer({
+        map: map,
+        polylineOptions: { strokeColor: "#00b894" }, // Meeting -> Destination
+      });
+
+      document.getElementById("routeBtn").addEventListener("click", () => {
+        calcRoutes();
+      });
+
+      document.getElementById("optBtn").addEventListener("click", () => {
+        optimizeMeetingPoint();
+      });
+
+      // Autocomplete for all text fields
+      new google.maps.places.Autocomplete(document.getElementById("addr1"));
+      new google.maps.places.Autocomplete(document.getElementById("addr2"));
+      new google.maps.places.Autocomplete(document.getElementById("meeting"));
+      new google.maps.places.Autocomplete(document.getElementById("destination"));
+
+      // If the meeting input changes manually, forget the clicked meeting point
+      const meetingInput = document.getElementById("meeting");
+      meetingInput.addEventListener("input", () => {
+        clearMeetingPoint();
+      });
+
+      // Click on the map to choose the meeting point
+      map.addListener("click", (e) => {
+        setMeetingPoint(e.latLng);
+      });
+    }
+
+    // Expose initMap for the callback
+    window.initMap = initMap;
+
+    function setMeetingPoint(latLng) {
+      meetingLatLng = latLng;
+
+      if (!meetingMarker) {
+        meetingMarker = new google.maps.Marker({
+          map: map,
+          position: latLng,
+          title: "Meeting point",
+        });
+      } else {
+        meetingMarker.setPosition(latLng);
+      }
+
+      const meetingInput = document.getElementById("meeting");
+      const lat = latLng.lat().toFixed(5);
+      const lng = latLng.lng().toFixed(5);
+      meetingInput.value = `Point on map (${lat}, ${lng})`;
+    }
+
+    function clearMeetingPoint() {
+      meetingLatLng = null;
+      if (meetingMarker) {
+        meetingMarker.setMap(null);
+        meetingMarker = null;
+      }
+    }
+
+    async function calcRoutes() {
+      const addr1 = document.getElementById("addr1").value.trim();
+      const addr2 = document.getElementById("addr2").value.trim();
+      const mode1 = document.getElementById("mode1").value;
+      const mode2 = document.getElementById("mode2").value;
+      const meetingText = document.getElementById("meeting").value.trim();
+      const destText = document.getElementById("destination").value.trim();
+
+      const errorSpan = document.getElementById("error");
+      const infoDiv = document.getElementById("info");
+
+      errorSpan.textContent = "";
+      infoDiv.textContent = "";
+
+      if (!addr1 || !addr2) {
+        errorSpan.textContent = "Please enter both person addresses.";
+        return;
+      }
+
+      // Meeting point is where they go first
+      let meetingDestination;
+      if (meetingLatLng) {
+        meetingDestination = meetingLatLng;
+      } else if (meetingText) {
+        meetingDestination = meetingText;
+      } else {
+        errorSpan.textContent = "Please choose a meeting point (click map or type it).";
+        return;
+      }
+
+      try {
+        // --- Person 1 → Meeting ---
+        const req1 = {
+          origin: addr1,
+          destination: meetingDestination,
+          travelMode: google.maps.TravelMode[mode1],
+        };
+        const res1 = await routePromise(req1);
+        renderer1.setDirections(res1);
+
+        const leg1 = res1.routes[0]?.legs?.[0];
+        let text1 = "";
+        let t1 = null;
+
+        if (leg1 && leg1.duration) {
+          t1 = leg1.duration.value; // seconds
+          text1 =
+            "Person 1 → Meeting (" + mode1.toLowerCase() + "):\n" +
+            "  Distance: " + (leg1.distance?.text || "?") + "\n" +
+            "  Duration: " + (leg1.duration?.text || "?") + "\n";
+        }
+
+        // --- Person 2 → Meeting ---
+        const req2 = {
+          origin: addr2,
+          destination: meetingDestination,
+          travelMode: google.maps.TravelMode[mode2],
+        };
+        const res2 = await routePromise(req2);
+        renderer2.setDirections(res2);
+
+        const leg2 = res2.routes[0]?.legs?.[0];
+        let text2 = "";
+        let t2 = null;
+
+        if (leg2 && leg2.duration) {
+          t2 = leg2.duration.value; // seconds
+          text2 =
+            "\nPerson 2 → Meeting (" + mode2.toLowerCase() + "):\n" +
+            "  Distance: " + (leg2.distance?.text || "?") + "\n" +
+            "  Duration: " + (leg2.duration?.text || "?") + "\n";
+        }
+
+        infoDiv.textContent = text1 + text2;
+
+        let tMeetingTotal = null;
+        if (t1 != null && t2 != null) {
+          const diff = Math.abs(t1 - t2);
+          const total = t1 + t2;
+          tMeetingTotal = total;
+          const diffMin = Math.round(diff / 60);
+          const totalMin = Math.round(total / 60);
+          infoDiv.textContent +=
+            "\nTotal time to meeting (both): ~" + totalMin + " min" +
+            "\nDifference in duration at meeting: ~" + diffMin + " min";
+        }
+
+        // --- Meeting → Destination (fastest mode from either person) ---
+        if (!destText) {
+          infoDiv.textContent +=
+            "\n\nNo final destination set: skipping Meeting → Destination leg and comparisons.";
+          rendererDest.setDirections({ routes: [] }); // clear
+          return;
+        }
+
+        const v1 = SPEEDS_KMH[mode1] || 0;
+        const v2 = SPEEDS_KMH[mode2] || 0;
+        let finalMode = mode1;
+        if (v2 > v1) {
+          finalMode = mode2;
+        }
+
+        const originMD = meetingLatLng || meetingText;
+
+        const reqDest = {
+          origin: originMD,
+          destination: destText,
+          travelMode: google.maps.TravelMode[finalMode],
+        };
+        const resDest = await routePromise(reqDest);
+        rendererDest.setDirections(resDest);
+
+        const legDest = resDest.routes[0]?.legs?.[0];
+        let tMD = null;
+
+        if (legDest && legDest.duration) {
+          tMD = legDest.duration.value; // seconds
+          infoDiv.textContent +=
+            "\n\nMeeting → Destination (" + finalMode.toLowerCase() + "):\n" +
+            "  Distance: " + (legDest.distance?.text || "?") + "\n" +
+            "  Duration: " + (legDest.duration?.text || "?") + "\n";
+        }
+
+        // --- Total times to Destination via Meeting ---
+        let total1 = null;
+        let total2 = null;
+        if (t1 != null && t2 != null && tMD != null) {
+          total1 = t1 + tMD;
+          total2 = t2 + tMD;
+
+          const total1Min = Math.round(total1 / 60);
+          const total2Min = Math.round(total2 / 60);
+          const diffEnd = Math.abs(total1 - total2);
+          const diffEndMin = Math.round(diffEnd / 60);
+
+          infoDiv.textContent +=
+            "\nTotal time to destination via meeting:\n" +
+            "  Person 1: ~" + total1Min + " min\n" +
+            "  Person 2: ~" + total2Min + " min\n" +
+            "  Difference at destination: ~" + diffEndMin + " min";
+
+          const groupViaMin = Math.round((total1 + total2) / 60);
+          infoDiv.textContent +=
+            "\nGroup total via meeting: ~" + groupViaMin + " min";
+        }
+
+        // --- Direct comparison: each person going straight to Destination ---
+        let direct1 = null;
+        let direct2 = null;
+
+        try {
+          const resDirect1 = await routePromise({
+            origin: addr1,
+            destination: destText,
+            travelMode: google.maps.TravelMode[mode1],
+          });
+          const legDirect1 = resDirect1.routes[0]?.legs?.[0];
+          if (legDirect1 && legDirect1.duration) {
+            direct1 = legDirect1.duration.value; // seconds
+          }
+        } catch (e1) {
+          console.warn("Direct route Person 1 failed:", e1);
+        }
+
+        try {
+          const resDirect2 = await routePromise({
+            origin: addr2,
+            destination: destText,
+            travelMode: google.maps.TravelMode[mode2],
+          });
+          const legDirect2 = resDirect2.routes[0]?.legs?.[0];
+          if (legDirect2 && legDirect2.duration) {
+            direct2 = legDirect2.duration.value; // seconds
+          }
+        } catch (e2) {
+          console.warn("Direct route Person 2 failed:", e2);
+        }
+
+        if (direct1 != null || direct2 != null) {
+          infoDiv.textContent += "\n\nComparison with going directly to destination:";
+
+          let groupDirect = null;
+          let groupVia = null;
+
+          if (direct1 != null && total1 != null) {
+            const direct1Min = Math.round(direct1 / 60);
+            const total1Min = Math.round(total1 / 60);
+            const delta1Min = total1Min - direct1Min;
+            const sign1 = delta1Min > 0 ? "+" : "";
+            infoDiv.textContent +=
+              "\n  Person 1: direct ~" + direct1Min + " min, " +
+              "via meeting ~" + total1Min + " min (" + sign1 + delta1Min + " min)";
+          }
+
+          if (direct2 != null && total2 != null) {
+            const direct2Min = Math.round(direct2 / 60);
+            const total2Min = Math.round(total2 / 60);
+            const delta2Min = total2Min - direct2Min;
+            const sign2 = delta2Min > 0 ? "+" : "";
+            infoDiv.textContent +=
+              "\n  Person 2: direct ~" + direct2Min + " min, " +
+              "via meeting ~" + total2Min + " min (" + sign2 + delta2Min + " min)";
+          }
+
+          if (
+            direct1 != null && direct2 != null &&
+            total1 != null && total2 != null
+          ) {
+            groupDirect = direct1 + direct2;
+            groupVia = total1 + total2;
+            const groupDirectMin = Math.round(groupDirect / 60);
+            const groupViaMin = Math.round(groupVia / 60);
+            const deltaGroupMin = groupViaMin - groupDirectMin;
+            const signG = deltaGroupMin > 0 ? "+" : "";
+            infoDiv.textContent +=
+              "\n\nGroup total direct: ~" + groupDirectMin + " min" +
+              "\nGroup total via meeting: ~" + groupViaMin + " min" +
+              "\nGroup difference: " + signG + deltaGroupMin + " min";
+          }
+        }
+
+      } catch (err) {
+        console.error("Error in calcRoutes:", err);
+        const errorSpan = document.getElementById("error");
+        errorSpan.textContent = "Error while computing routes.";
+      }
+    }
+
+    async function optimizeMeetingPoint() {
+      const addr1 = document.getElementById("addr1").value.trim();
+      const addr2 = document.getElementById("addr2").value.trim();
+      const mode1 = document.getElementById("mode1").value;
+      const mode2 = document.getElementById("mode2").value;
+      const destText = document.getElementById("destination").value.trim();
+
+      const errorSpan = document.getElementById("error");
+      const infoDiv = document.getElementById("info");
+
+      errorSpan.textContent = "";
+      infoDiv.textContent = "";
+
+      if (!addr1 || !addr2) {
+        errorSpan.textContent = "Please enter both person addresses.";
+        return;
+      }
+      if (!destText) {
+        errorSpan.textContent = "Please enter a final destination.";
+        return;
+      }
+
+      const destination = destText; // string address; Directions will geocode it
+      const candidates = [];
+      const numPerPath = 6; // adjust if you want more/less precision vs API calls
+
+      try {
+        // --- 1) Person 1 -> Destination ---
+        try {
+          const r1Dest = await routePromise({
+            origin: addr1,
+            destination: destination,
+            travelMode: google.maps.TravelMode[mode1],
+          });
+          const route = r1Dest.routes[0];
+          if (route && route.overview_path) {
+            candidates.push(...samplePath(route.overview_path, numPerPath));
+          }
+        } catch (e) {
+          console.warn("Route P1 -> Dest failed (still continuing):", e);
+        }
+
+        // --- 2) Person 1 -> Person 2 ---
+        try {
+          const r1to2 = await routePromise({
+            origin: addr1,
+            destination: addr2,
+            travelMode: google.maps.TravelMode[mode1],
+          });
+          const route = r1to2.routes[0];
+          if (route && route.overview_path) {
+            candidates.push(...samplePath(route.overview_path, numPerPath));
+          }
+        } catch (e) {
+          console.warn("Route P1 -> P2 failed (still continuing):", e);
+        }
+
+        // --- 3) Person 2 -> Destination ---
+        try {
+          const r2Dest = await routePromise({
+            origin: addr2,
+            destination: destination,
+            travelMode: google.maps.TravelMode[mode2],
+          });
+          const route = r2Dest.routes[0];
+          if (route && route.overview_path) {
+            candidates.push(...samplePath(route.overview_path, numPerPath));
+          }
+        } catch (e) {
+          console.warn("Route P2 -> Dest failed (still continuing):", e);
+        }
+
+        if (candidates.length === 0) {
+          errorSpan.textContent = "Could not generate candidate meeting points.";
+          return;
+        }
+
+        // 4) Evaluate each candidate: Person 1 -> candidate, Person 2 -> candidate
+        let bestCandidate = null;
+        let bestTotal = Infinity;
+        let bestDiff = Infinity;
+
+        for (const point of candidates) {
+          let res1;
+          try {
+            res1 = await routePromise({
+              origin: addr1,
+              destination: point,
+              travelMode: google.maps.TravelMode[mode1],
+            });
+          } catch (status1) {
+            console.warn("Skip candidate for Person 1, status:", status1);
+            continue;
+          }
+
+          const leg1 = res1.routes[0]?.legs?.[0];
+          if (!leg1 || !leg1.duration) continue;
+          const t1 = leg1.duration.value;
+
+          let res2;
+          try {
+            res2 = await routePromise({
+              origin: addr2,
+              destination: point,
+              travelMode: google.maps.TravelMode[mode2],
+            });
+          } catch (status2) {
+            console.warn("Skip candidate for Person 2, status:", status2);
+            continue;
+          }
+
+          const leg2 = res2.routes[0]?.legs?.[0];
+          if (!leg2 || !leg2.duration) continue;
+          const t2 = leg2.duration.value;
+
+          const total = t1 + t2;
+          const diff = Math.abs(t1 - t2);
+
+          // primary: total time, secondary: fairness
+          if (total < bestTotal || (total === bestTotal && diff < bestDiff)) {
+            bestTotal = total;
+            bestDiff = diff;
+            bestCandidate = { point, t1, t2 };
+          }
+        }
+
+        if (!bestCandidate) {
+          errorSpan.textContent = "Could not find a good meeting point among candidates.";
+          return;
+        }
+
+        // 5) Set the best candidate as the meeting point
+        clearMeetingPoint();
+        const bestLatLng = bestCandidate.point;
+        setMeetingPoint(bestLatLng);
+        map.panTo(bestLatLng);
+
+        // 6) Show routes and comparisons
+        await calcRoutes();
+
+      } catch (err) {
+        console.error("Error during optimization:", err);
+        errorSpan.textContent = "Error while optimizing the meeting point.";
+      }
+    }
+  </script>
+</body>
+</html>
