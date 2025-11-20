@@ -4,33 +4,139 @@
   <meta charset="utf-8" />
   <title>ToGather – Fair Meeting Point</title>
   <style>
+    :root {
+      --bg: #f3f4f6;
+      --bg-elevated: #ffffff;
+      --border-subtle: #d1d5db;
+      --accent: #3b82f6;
+      --accent-soft: rgba(59,130,246,0.12);
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --danger: #ef4444;
+      --chip-bg: #e5e7eb;
+      --chip-bg-active: #dbeafe;
+    }
+
+    body.dark {
+      --bg: #030712;
+      --bg-elevated: #020617;
+      --border-subtle: #1f2937;
+      --accent: #60a5fa;
+      --accent-soft: rgba(96,165,250,0.16);
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --danger: #f97373;
+      --chip-bg: #111827;
+      --chip-bg-active: #1f2937;
+    }
+
     html, body {
       height: 100%;
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
     }
-    #controls {
-      padding: 12px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+
+    body {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: flex-start;
-      z-index: 2;
-      background: #fff;
+      flex-direction: column;
     }
+
+    #controls {
+      padding: 10px 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+      z-index: 2;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    #toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    #app-title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    #app-title h1 {
+      font-size: 1.1rem;
+      margin: 0;
+      letter-spacing: 0.02em;
+    }
+
+    #app-title span {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    #themeToggle {
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      padding: 4px 10px;
+      background: var(--chip-bg);
+      color: var(--text-main);
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    #themeToggle span {
+      font-size: 1rem;
+    }
+
+    #control-grid {
+      display: grid;
+      grid-template-columns: minmax(260px, 1.4fr) minmax(260px, 1fr) minmax(260px, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 900px) {
+      #control-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .block {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      min-width: 240px;
+      gap: 6px;
+      min-width: 0;
+      background: var(--bg-elevated);
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      padding: 8px 10px;
     }
+
+    .block label {
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
     .person-block {
-      border: 1px solid #ddd;
-      border-radius: 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
       padding: 6px 8px;
-      background: #fafafa;
+      background: var(--bg);
     }
+
+    .person-result {
+      margin-top: 6px;
+      font-size: 0.8em;
+      padding: 6px;
+      border-radius: 6px;
+      background: var(--bg-elevated);
+      border: 1px dashed var(--border-subtle);
+    }
+
     .person-header {
       display: flex;
       justify-content: space-between;
@@ -39,73 +145,193 @@
       margin-bottom: 4px;
     }
     .person-header button {
-      font-size: 0.8em;
+      font-size: 0.75em;
       padding: 2px 6px;
     }
+
     #controls button {
       padding: 6px 12px;
       cursor: pointer;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: var(--chip-bg);
+      color: var(--text-main);
+      font-size: 0.85rem;
     }
+
+    #controls button:hover {
+      background: var(--chip-bg-active);
+    }
+
+    input, select {
+      font: inherit;
+      padding: 5px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-elevated);
+      color: var(--text-main);
+    }
+
+    select {
+      padding-right: 26px;
+    }
+
     #map {
-      height: calc(100% - 64px);
+      flex: 1 1 auto;
+      min-height: 320px;
     }
+
     #error {
-      color: #b00020;
-      font-size: 0.9em;
+      color: var(--danger);
+      font-size: 0.85em;
     }
+
+    .field-hint {
+      font-size: 0.8em;
+      color: var(--text-muted);
+    }
+
+    .validated-input {
+      border: 1px solid #22c55e !important;
+      background: rgba(34,197,94,0.08);
+    }
+
+    .pending-input {
+      border: 1px solid #fbbf24 !important;
+      background: rgba(251,191,36,0.08);
+    }
+
+    .inline-field {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .inline-field button {
+      white-space: nowrap;
+    }
+
+    /* Details panel */
+    #details-panel {
+      margin-top: 6px;
+      padding-top: 4px;
+      border-top: 1px dashed var(--border-subtle);
+    }
+
+    #toggleDetailsBtn {
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: var(--chip-bg);
+      font-size: 0.8rem;
+      padding: 3px 10px;
+      cursor: pointer;
+    }
+
     #info {
-      padding: 8px;
-      font-size: 0.9em;
+      padding: 6px 2px;
+      font-size: 0.85em;
       white-space: pre-line;
+      display: none;
+      color: var(--text-muted);
+    }
+
+    /* Loading overlay */
+    #loadingOverlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2em;
+      font-weight: 500;
+      color: #e5e7eb;
+      z-index: 9999;
     }
   </style>
 </head>
 
 <body>
+  <!-- Loading overlay for optimization -->
+  <div id="loadingOverlay">
+    <!-- Filled dynamically -->
+  </div>
+
   <div id="controls">
-    <div class="block" style="min-width: 320px;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <strong>People</strong>
-        <button id="addPersonBtn" type="button">Add person</button>
+    <div id="toolbar">
+      <div id="app-title">
+        <h1>ToGather</h1>
+        <span>Find a fair meeting point for everyone</span>
       </div>
-      <small>Each person has an address and a travel mode.</small>
-      <div id="people-container" style="display:flex; flex-direction:column; gap:6px; margin-top:4px;"></div>
+      <button id="themeToggle" type="button">
+        <span id="themeToggleIcon">🌙</span>
+        <span id="themeToggleLabel">Dark mode</span>
+      </button>
     </div>
 
-    <div class="block">
-      <label>Meeting point</label>
-      <gmp-place-autocomplete
-        id="meeting"
-        placeholder="Choose a meeting place or click on the map"
-        style="width: 280px;"
-      ></gmp-place-autocomplete>
-      <small id="meetingHint">
-        Click on the map to set the meeting point, or choose an address here.
-      </small>
-    </div>
+    <div id="control-grid">
+      <div class="block" style="min-width: 260px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>People</strong>
+          <button id="addPersonBtn" type="button">Add person</button>
+        </div>
+        <small class="field-hint">Each person has an address and a travel mode.</small>
+        <div id="people-container" style="display:flex; flex-direction:column; gap:6px; margin-top:4px;"></div>
+      </div>
 
-    <div class="block">
-      <label>Destination</label>
-      <gmp-place-autocomplete
-        id="destination"
-        placeholder="Final destination"
-        style="width: 280px;"
-      ></gmp-place-autocomplete>
-      <small>Everyone goes here after meeting.</small>
-    </div>
+      <div class="block">
+        <label for="meeting-input">Meeting point</label>
+        <div class="inline-field">
+          <input
+            id="meeting-input"
+            type="text"
+            placeholder="Choose a meeting place or click on the map"
+            style="flex: 1 1 180px;"
+            title="You can choose a meeting place yourself, or leave it empty and use Optimize."
+          />
+          <button id="optBtn" type="button" title="Let the app compute a fair meeting point for everyone.">
+            ⚖️ Optimize
+          </button>
+          <button id="snapBtn" type="button" title="Snap the meeting point to a safe nearby place.">
+            📍 Snap to safe
+          </button>
+        </div>
+        <small id="meetingHint" class="field-hint">
+          You can either:
+          • click on the map or choose an address here, or
+          • leave it empty and click <strong>Optimize</strong> to let the app find a fair meeting point.
+        </small>
+      </div>
 
-    <div class="block">
-      <button id="routeBtn" type="button">Show routes</button>
-      <button id="optBtn" type="button">Optimize meeting point</button>
-      <button id="snapBtn" type="button">Snap meeting to safe place</button>
-      <span id="error"></span>
-      <small style="margin-top:4px; color:#555;">
-        Tip: after typing an address, click a suggestion so the app can use it.
-      </small>
+      <div class="block">
+        <label for="destination-input">Destination</label>
+        <input
+          id="destination-input"
+          type="text"
+          placeholder="Final destination"
+          style="width: 100%;"
+          title="Start typing the final destination and pick a suggestion."
+        />
+        <small class="field-hint">
+          Everyone will go here after meeting. Pick a suggestion to confirm the address.
+        </small>
+
+        <button id="routeBtn" type="button" style="margin-top:4px;">Show routes</button>
+        <span id="error"></span>
+
+        <div id="details-panel">
+          <button id="toggleDetailsBtn" type="button" style="display:none;">Show details</button>
+          <div id="info"></div>
+        </div>
+
+        <small class="field-hint">
+          Tip: after typing an address, click a suggestion so the app can use it.
+        </small>
+      </div>
     </div>
   </div>
 
-  <div id="info"></div>
   <div id="map"></div>
 
   <!-- API key + mapId in config.js -->
@@ -173,6 +399,92 @@
     let people = [];
     let nextPersonId = 1;
 
+    // Loading progress state
+    let optimizationStartTime = null;
+    const ROUTE_PHASE_WEIGHT = 0.4; // 40% for alt routes, 60% for evaluation
+
+    // ---- Theme handling ----
+    function applyTheme(theme) {
+      const body = document.body;
+      const iconSpan = document.getElementById("themeToggleIcon");
+      const labelSpan = document.getElementById("themeToggleLabel");
+
+      const dark = theme === "dark";
+      body.classList.toggle("dark", dark);
+
+      if (dark) {
+        iconSpan.textContent = "☀️";
+        labelSpan.textContent = "Light mode";
+      } else {
+        iconSpan.textContent = "🌙";
+        labelSpan.textContent = "Dark mode";
+      }
+    }
+
+    function initTheme() {
+      const stored = localStorage.getItem("tg_theme");
+      let theme = stored;
+      if (!theme) {
+        theme = window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+      }
+      applyTheme(theme);
+    }
+
+    function toggleTheme() {
+      const isDark = document.body.classList.contains("dark");
+      const next = isDark ? "light" : "dark";
+      localStorage.setItem("tg_theme", next);
+      applyTheme(next);
+    }
+
+    // ---- Loading overlay helpers ----
+    function showLoading(initialMessage = "Preparing optimization…") {
+      optimizationStartTime = Date.now();
+      const overlay = document.getElementById("loadingOverlay");
+      overlay.style.display = "flex";
+      updateLoading(initialMessage, 0);
+    }
+
+    function updateLoading(message, progress) {
+      const overlay = document.getElementById("loadingOverlay");
+      if (!overlay || overlay.style.display === "none") return;
+
+      const p = Math.max(0, Math.min(1, progress || 0));
+      const pct = Math.round(p * 100);
+
+      const now = Date.now();
+      const elapsedSec = optimizationStartTime ? (now - optimizationStartTime) / 1000 : 0;
+
+      let etaText = "";
+      if (p > 0.05 && elapsedSec > 1) {
+        const totalEstSec = elapsedSec / p;
+        const remainingSec = Math.max(0, totalEstSec - elapsedSec);
+        const rem = Math.round(remainingSec);
+        if (rem < 60) {
+          etaText = `Estimated time remaining: ~${rem}s`;
+        } else {
+          const remMin = Math.round(rem / 60);
+          etaText = `Estimated time remaining: ~${remMin} min`;
+        }
+      }
+
+      overlay.innerHTML = `
+        <div style="text-align:center; padding:16px 24px; border-radius:12px; background:#020617ee; box-shadow:0 2px 8px rgba(0,0,0,0.35); color:#e5e7eb; min-width:240px;">
+          <div style="font-weight:600; margin-bottom:4px;">${message}</div>
+          <div style="margin-top:4px;">Progress: ${pct}%</div>
+          ${etaText ? `<div style="margin-top:4px; font-size:0.9em; opacity:.85;">${etaText}</div>` : ""}
+        </div>
+      `;
+    }
+
+    function hideLoading() {
+      const overlay = document.getElementById("loadingOverlay");
+      overlay.style.display = "none";
+    }
+
     // ---- Helpers ----
 
     function routePromise(request) {
@@ -201,37 +513,40 @@
       return candidates;
     }
 
-    // Normalize Place.location to google.maps.LatLng and call callback
-    function setupAutocompleteElement(el, onPlaceSelected) {
-      if (!el) return;
-      el.addEventListener("gmp-select", async (event) => {
-        const placePrediction = event.placePrediction;
-        if (!placePrediction) {
-          console.warn("gmp-select without placePrediction", event);
+    // Attach a Places Autocomplete to a text input
+    function setupAutocompleteInput(inputEl, onPlaceSelected) {
+      if (!inputEl) return null;
+
+      setValidationState(inputEl, false);
+
+      const autocomplete = new google.maps.places.Autocomplete(inputEl, {
+        fields: ["geometry", "formatted_address", "name"],
+      });
+
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (!place || !place.geometry || !place.geometry.location) {
+          setValidationState(inputEl, false);
           return;
         }
 
-        const place = placePrediction.toPlace();
-        await place.fetchFields({
-          fields: ["location", "displayName", "formattedAddress"],
+        const location = place.geometry.location;
+        const formattedAddress =
+          place.formatted_address || place.name || inputEl.value;
+
+        onPlaceSelected({
+          location,
+          formattedAddress,
         });
 
-        if (place.location) {
-          const loc = place.location;
-          let lat, lng;
-          if (loc instanceof google.maps.LatLng) {
-            // already fine
-          } else if (typeof loc.lat === "function" && typeof loc.lng === "function") {
-            // also fine
-          } else {
-            lat = loc.lat ?? loc.latitude;
-            lng = loc.lng ?? loc.longitude;
-            place.location = new google.maps.LatLng(lat, lng);
-          }
-        }
-
-        onPlaceSelected(place);
+        setValidationState(inputEl, true);
       });
+
+      inputEl.addEventListener("input", () => {
+        setValidationState(inputEl, false);
+      });
+
+      return autocomplete;
     }
 
     // Places API (new) nearby search to find a "safe" meeting place
@@ -325,6 +640,20 @@
       }
     }
 
+    function reverseGeocodeLatLng(latLng) {
+      return new Promise((resolve, reject) => {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ location: latLng }, (results, status) => {
+          if (status === google.maps.GeocoderStatus.OK && results[0]) {
+            resolve(results[0].formatted_address);
+          } else {
+            console.warn("Reverse geocoding failed:", status);
+            resolve(null);
+          }
+        });
+      });
+    }
+
     async function snapCurrentMeetingPoint() {
       const errorSpan = document.getElementById("error");
       errorSpan.textContent = "";
@@ -336,19 +665,37 @@
       }
 
       const safeLatLng = await getSafeMeetingPoint(meetingLatLng);
-      if (!safeLatLng) {
-        errorSpan.textContent = "Could not find a safer place nearby.";
-        return;
-      }
-
       clearMeetingPoint();
       setMeetingPoint(safeLatLng);
       map.panTo(safeLatLng);
 
+      try {
+        const meetingInput = document.getElementById("meeting-input");
+        const addr = await reverseGeocodeLatLng(safeLatLng);
+        if (addr) {
+          meetingAddress = addr;
+          if (meetingInput) {
+            meetingInput.value = addr;
+            if (typeof setValidationState === "function") {
+              setValidationState(meetingInput, true);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to reverse geocode meeting point:", e);
+      }
+
+      updateLoading("Finalizing routes…", 1);
+      hideLoading();
       await calcRoutes();
     }
 
     function setMeetingPoint(latLng) {
+      if (!latLng) {
+        console.warn("setMeetingPoint called with null/undefined");
+        return;
+      }
+
       meetingLatLng = latLng;
 
       if (!meetingMarker) {
@@ -397,32 +744,42 @@
           <button type="button" class="delete-person">Delete</button>
         </div>
         <label>Address</label>
-        <gmp-place-autocomplete
+        <input
+          type="text"
+          class="person-address"
           placeholder="${labelText} address"
-          style="width: 260px;"
-        ></gmp-place-autocomplete>
+          style="width: 100%;"
+          title="Start typing an address and pick a suggestion."
+        />
+        <small class="field-hint">
+          Make sure you choose a suggestion so the address is applied.
+        </small>
         <label style="margin-top:4px;">
           Mode:
-          <select>
-            <option value="DRIVING">Driving</option>
-            <option value="WALKING">Walking</option>
-            <option value="BICYCLING">Cycling</option>
-            <option value="TRANSIT">Transit</option>
+          <select title="Choose how this person travels to the meeting point and destination.">
+            <option value="DRIVING">🚗 Driving</option>
+            <option value="WALKING" selected>🚶 Walking</option>
+            <option value="BICYCLING">🚲 Cycling</option>
+            <option value="TRANSIT">🚆 Transit</option>
           </select>
         </label>
       `;
 
       container.appendChild(wrapper);
 
-      const autocompleteEl = wrapper.querySelector("gmp-place-autocomplete");
+      const addressInput = wrapper.querySelector("input.person-address");
       const modeSelect = wrapper.querySelector("select");
       const deleteBtn = wrapper.querySelector(".delete-person");
+
+      if (initial?.address) {
+        addressInput.value = initial.address;
+      }
 
       const person = {
         id,
         label: labelText,
         element: wrapper,
-        autocompleteEl,
+        addressInput,
         modeSelect,
         address: initial?.address || "",
         location: null,
@@ -433,8 +790,8 @@
         modeSelect.value = initial.mode;
       }
 
-      setupAutocompleteElement(autocompleteEl, (place) => {
-        person.address = place.formattedAddress || "";
+      setupAutocompleteInput(addressInput, (place) => {
+        person.address = place.formattedAddress || place.formatted_address || "";
         person.location = place.location || null;
       });
 
@@ -446,8 +803,27 @@
       people.push(person);
     }
 
+    // ---- Details helper ----
+    function setDetailsText(text) {
+      const infoDiv = document.getElementById("info");
+      const btn = document.getElementById("toggleDetailsBtn");
+
+      infoDiv.textContent = text || "";
+
+      if (text && text.trim()) {
+        btn.style.display = "inline-block";
+        btn.textContent = "Show details";
+        infoDiv.style.display = "none";
+      } else {
+        btn.style.display = "none";
+        infoDiv.style.display = "none";
+      }
+    }
+
     // ---- Map init ----
     function initMap() {
+      initTheme();
+
       map = new google.maps.Map(document.getElementById("map"), {
         zoom: 11,
         center: { lat: 48.5734, lng: 7.7521 }, // Strasbourg-ish
@@ -459,6 +835,8 @@
         map,
         polylineOptions: { strokeColor: "#00b894" },
       });
+
+      document.getElementById("themeToggle").addEventListener("click", toggleTheme);
 
       document.getElementById("routeBtn").addEventListener("click", () => {
         calcRoutes();
@@ -476,30 +854,44 @@
         addPerson();
       });
 
-      // Meeting autocomplete
-      setupAutocompleteElement(
-        document.getElementById("meeting"),
-        (place) => {
-          meetingAddress = place.formattedAddress || "";
-          if (place.location) {
-            setMeetingPoint(place.location);
-          } else {
-            clearMeetingPoint();
-          }
+      document.getElementById("toggleDetailsBtn").addEventListener("click", () => {
+        const infoDiv = document.getElementById("info");
+        const btn = document.getElementById("toggleDetailsBtn");
+        const isVisible = infoDiv.style.display !== "none";
+
+        if (isVisible) {
+          infoDiv.style.display = "none";
+          btn.textContent = "Show details";
+        } else {
+          infoDiv.style.display = "block";
+          btn.textContent = "Hide details";
         }
-      );
+      });
+
+      // Meeting autocomplete
+      const meetingInput = document.getElementById("meeting-input");
+      setupAutocompleteInput(meetingInput, (place) => {
+        meetingAddress = place.formattedAddress || "";
+        if (place.location) {
+          setMeetingPoint(place.location);
+        } else {
+          clearMeetingPoint();
+        }
+      });
 
       // Destination autocomplete
-      setupAutocompleteElement(
-        document.getElementById("destination"),
-        (place) => {
-          destinationAddress = place.formattedAddress || "";
-          destinationLocation = place.location || null;
-        }
-      );
+      const destinationInput = document.getElementById("destination-input");
+      setupAutocompleteInput(destinationInput, (place) => {
+        destinationAddress = place.formattedAddress || "";
+        destinationLocation = place.location || null;
+      });
 
       // Initial scenario: 2 people
       INITIAL_PERSONS.forEach((p) => addPerson(p));
+
+      if (INITIAL_DEST) {
+        destinationInput.value = INITIAL_DEST;
+      }
 
       // Meeting from map click
       map.addListener("click", (e) => {
@@ -513,9 +905,13 @@
 
     async function calcRoutes() {
       const errorSpan = document.getElementById("error");
-      const infoDiv = document.getElementById("info");
       errorSpan.textContent = "";
-      infoDiv.textContent = "";
+      setDetailsText("");
+
+      people.forEach(p => {
+        const old = p.element.querySelector(".person-result");
+        if (old) old.remove();
+      });
 
       if (people.length === 0) {
         errorSpan.textContent = "Add at least one person.";
@@ -536,16 +932,16 @@
         meetingDestination = meetingAddress;
       } else {
         errorSpan.textContent =
-          "Please choose a meeting point (click map or select an address).";
+          "Please choose a meeting point (optimize, click on map, or select an address) before snapping.";
         return;
       }
 
-      // Clear old person polylines
       personRenderers.forEach((r) => r.setMap(null));
       personRenderers = [];
 
       let text = "";
       const personResults = [];
+      let bounds = new google.maps.LatLngBounds();
 
       try {
         // For each person: origin -> meeting
@@ -580,6 +976,9 @@
           const leg = res.routes[0]?.legs?.[0];
           if (!leg || !leg.duration) continue;
 
+          if (leg.start_location) bounds.extend(leg.start_location);
+          if (leg.end_location) bounds.extend(leg.end_location);
+
           const t = leg.duration.value;
           const dText = leg.distance?.text || "?";
           const tText = leg.duration?.text || "?";
@@ -590,6 +989,16 @@
             mode,
             tMeeting: t,
           });
+
+          const resultDiv = document.createElement("div");
+          resultDiv.className = "person-result";
+          resultDiv.innerHTML = `
+            🧭 Route:<br>
+            • Distance: ${dText}<br>
+            • Duration: ${tText}<br>
+            • Mode: ${mode.toLowerCase()}
+          `;
+          person.element.appendChild(resultDiv);
 
           text += `${displayName} → Meeting (${mode.toLowerCase()}): ${dText}, ${tText}\n`;
           idx++;
@@ -624,6 +1033,9 @@
         if (legDest && legDest.duration) {
           tDest = legDest.duration.value;
           text += `\nMeeting → Destination (${fastestMode.toLowerCase()}): ${legDest.distance.text}, ${legDest.duration.text}\n`;
+
+          if (legDest.start_location) bounds.extend(legDest.start_location);
+          if (legDest.end_location) bounds.extend(legDest.end_location);
         }
 
         // Totals to meeting
@@ -689,7 +1101,11 @@
           }
         }
 
-        document.getElementById("info").textContent = text;
+        setDetailsText(text);
+
+        if (!bounds.isEmpty()) {
+          map.fitBounds(bounds, { padding: 80 });
+        }
       } catch (err) {
         console.error("Error in calcRoutes:", err);
         errorSpan.textContent = "Error while computing routes. See console.";
@@ -715,64 +1131,77 @@
 
       const finalDest = destinationLocation || destText;
 
-      // Get destination LatLng (if we only have a string)
-      let destLatLng = destinationLocation;
-      if (!destLatLng) {
-        try {
-          destLatLng = await new Promise((resolve, reject) => {
-            const geocoder = new google.maps.Geocoder();
-            geocoder.geocode({ address: destText }, (results, status) => {
-              if (status === google.maps.GeocoderStatus.OK && results[0]) {
-                resolve(results[0].geometry.location);
-              } else {
-                reject(status);
-              }
-            });
-          });
-        } catch (e) {
-          console.error("Geocoding destination failed:", e);
-          errorSpan.textContent = "Could not geocode the destination.";
-          return;
-        }
-      }
+      showLoading("Checking alternative routes…");
 
-      // For each person, compute route(s) to destination and sample points
-      let candidates = [];
       try {
+        let destLatLng = destinationLocation;
+        if (!destLatLng) {
+          try {
+            destLatLng = await new Promise((resolve, reject) => {
+              const geocoder = new google.maps.Geocoder();
+              geocoder.geocode({ address: destText }, (results, status) => {
+                if (status === google.maps.GeocoderStatus.OK && results[0]) {
+                  resolve(results[0].geometry.location);
+                } else {
+                  reject(status);
+                }
+              });
+            });
+          } catch (e) {
+            console.error("Geocoding destination failed:", e);
+            hideLoading();
+            errorSpan.textContent = "Could not geocode the destination.";
+            return;
+          }
+        }
+
+        // Phase 1: compute route(s) to destination for each person and sample candidates
+        let candidates = [];
+        const routeStepsTotal = people.length || 1;
+        let routeStepsDone = 0;
+
         for (const person of people) {
           const originAddress =
             person.address || person.defaultAddress || "";
           const origin = person.location || originAddress;
           const mode = person.modeSelect.value;
 
-          if (!origin) continue;
+          if (!origin) {
+            routeStepsDone++;
+            const frac = (ROUTE_PHASE_WEIGHT * routeStepsDone) / routeStepsTotal;
+            updateLoading("Checking alternative routes…", frac);
+            continue;
+          }
 
           const res = await routePromise({
             origin,
             destination: destLatLng,
             travelMode: google.maps.TravelMode[mode],
-            provideRouteAlternatives: true, // ✅ explore alt routes
+            provideRouteAlternatives: true,
           });
 
-          if (!res.routes || res.routes.length === 0) continue;
-
-          for (const r of res.routes) {
-            if (!r.overview_path) continue;
-            const samples = findIntermediatePoints(r.overview_path, 10); // ✅ more samples
-            candidates.push(...samples);
+          if (res.routes && res.routes.length > 0) {
+            for (const r of res.routes) {
+              if (!r.overview_path) continue;
+              const samples = findIntermediatePoints(r.overview_path, 10);
+              candidates.push(...samples);
+            }
           }
+
+          routeStepsDone++;
+          const frac = (ROUTE_PHASE_WEIGHT * routeStepsDone) / routeStepsTotal;
+          updateLoading("Checking alternative routes…", frac);
         }
 
-        // Also consider the destination itself as candidate
         candidates.push(destLatLng);
 
         if (candidates.length === 0) {
+          hideLoading();
           errorSpan.textContent =
             "Could not generate candidate meeting points along routes.";
           return;
         }
 
-        // 🧹 Deduplicate candidates by rounding
         const seen = new Set();
         candidates = candidates.filter((pt) => {
           const key = pt.lat().toFixed(5) + "," + pt.lng().toFixed(5);
@@ -781,10 +1210,12 @@
           return true;
         });
 
+        const evalStepsTotal = Math.max(1, candidates.length * people.length);
+        let evalStepsDone = 0;
+
         let bestPoint = null;
         let bestTotal = Infinity;
 
-        // Evaluate each candidate: sum of travel times for all persons to candidate
         for (const cand of candidates) {
           let total = 0;
           let valid = true;
@@ -797,7 +1228,8 @@
 
             if (!origin) {
               valid = false;
-              break;
+              evalStepsDone += 1;
+              continue;
             }
 
             try {
@@ -809,13 +1241,18 @@
               const leg = res.routes[0]?.legs?.[0];
               if (!leg || !leg.duration) {
                 valid = false;
-                break;
+              } else {
+                total += leg.duration.value;
               }
-              total += leg.duration.value;
             } catch (e) {
               valid = false;
-              break;
             }
+
+            evalStepsDone += 1;
+            const evalFrac = evalStepsDone / evalStepsTotal;
+            const globalFrac =
+              ROUTE_PHASE_WEIGHT + (1 - ROUTE_PHASE_WEIGHT) * evalFrac;
+            updateLoading("Evaluating meeting points…", globalFrac);
           }
 
           if (!valid) continue;
@@ -826,22 +1263,55 @@
         }
 
         if (!bestPoint) {
+          hideLoading();
           errorSpan.textContent =
             "Could not find a good meeting point among candidates.";
           return;
         }
 
         const safeLatLng = await getSafeMeetingPoint(bestPoint);
+        if (!safeLatLng) {
+          hideLoading();
+          console.warn("getSafeMeetingPoint returned null for", bestPoint);
+          errorSpan.textContent =
+            "Could not find a safe meeting point nearby.";
+          return;
+        }
+
         clearMeetingPoint();
         setMeetingPoint(safeLatLng);
         map.panTo(safeLatLng);
 
+        try {
+          const meetingInput = document.getElementById("meeting-input");
+          const addr = await reverseGeocodeLatLng(safeLatLng);
+          if (addr) {
+            meetingAddress = addr;
+            if (meetingInput) {
+              meetingInput.value = addr;
+              if (typeof setValidationState === "function") {
+                setValidationState(meetingInput, true);
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed to reverse geocode optimized meeting point:", e);
+        }
+
+        updateLoading("Finalizing routes…", 1);
+        hideLoading();
         await calcRoutes();
       } catch (err) {
         console.error("Error during optimizeMeetingPoint:", err);
         errorSpan.textContent =
           "Error while optimizing meeting point. See console.";
+        hideLoading();
       }
+    }
+
+    function setValidationState(el, isValid) {
+      el.classList.remove("validated-input", "pending-input");
+      el.classList.add(isValid ? "validated-input" : "pending-input");
     }
   </script>
 </body>
