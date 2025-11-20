@@ -1355,5 +1355,147 @@
       el.classList.add(isValid ? "validated-input" : "pending-input");
     }
   </script>
+
+  <!-- LEGAL FOOTER -->
+  <footer style="
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border-subtle);
+    padding: 14px 18px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 10px;
+    text-align: center;
+  ">
+    <div style="margin-bottom:6px;">
+      © 2025 ToGather — Open-source tool to compute fair meeting points.
+    </div>
+
+    <a href="#" id="openPrivacy" style="margin:0 8px; color: var(--accent); text-decoration:none;">Privacy Notice</a>
+    ·
+    <a href="#" id="openTerms" style="margin:0 8px; color: var(--accent); text-decoration:none;">Terms of Use</a>
+    ·
+    <a href="https://github.com/Zwyk/ToGather" target="_blank" style="margin:0 8px; color: var(--accent); text-decoration:none;">
+      GitHub
+    </a>
+
+    <div style="margin-top:6px;">
+      This project uses Google Maps APIs. By using this site you agree to the 
+      <a href="https://policies.google.com/terms" target="_blank" style="color: var(--accent);">Google Terms of Service</a>.
+    </div>
+  </footer>
+
+  <!-- ===== MODALS (Privacy & Terms) ===== -->
+  <style>
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999999;
+    }
+    .modal-box {
+      background: var(--bg-elevated);
+      max-width: 600px;
+      width: 90%;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-box h2 {
+      margin-top:0;
+      font-size: 1.2rem;
+    }
+    .modal-close {
+      margin-top: 16px;
+      display: inline-block;
+      background: var(--chip-bg);
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      border: 1px solid var(--border-subtle);
+    }
+  </style>
+
+  <!-- Privacy Modal -->
+  <div id="privacyModal" class="modal-overlay">
+    <div class="modal-box">
+      <h2>Privacy Notice</h2>
+      <p>
+        ToGather does not collect or store any personally identifiable data.
+        Addresses you enter are processed only locally in your browser and sent
+        directly to Google Maps services to compute routes and place
+        suggestions. No information is transmitted to any server controlled by
+        the creator of this tool.
+      </p>
+      <p>
+        Since everything runs client-side, closing your browser window deletes
+        all input data. Your browser may keep cached Google Maps results as part
+        of normal web operation.
+      </p>
+      <p>
+        By using this tool, you also accept the Google Maps Platform
+        <a href="https://policies.google.com/privacy" target="_blank">Privacy Policy</a>.
+      </p>
+      <button class="modal-close" data-close="privacyModal">Close</button>
+    </div>
+  </div>
+
+  <!-- Terms Modal -->
+  <div id="termsModal" class="modal-overlay">
+    <div class="modal-box">
+      <h2>Terms of Use</h2>
+      <p>
+        This tool is provided “as-is”, without warranty of any kind. Results
+        may be inaccurate due to real-world traffic variability, address
+        coverage, or API limitations. You remain responsible for verifying all
+        suggested routes and meeting locations.
+      </p>
+      <p>
+        This project is non-commercial and open-source. You are free to fork,
+        reuse, or modify the code under the MIT license (unless stated
+        otherwise in the GitHub repository).
+      </p>
+      <p>
+        The creator cannot be held liable for issues arising from inaccurate
+        routing or misuse of the tool.
+      </p>
+      <button class="modal-close" data-close="termsModal">Close</button>
+    </div>
+  </div>
+
+  <script>
+    function openModal(id) {
+      document.getElementById(id).style.display = "flex";
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).style.display = "none";
+    }
+
+    document.getElementById("openPrivacy").onclick = (e) => {
+      e.preventDefault();
+      openModal("privacyModal");
+    };
+    document.getElementById("openTerms").onclick = (e) => {
+      e.preventDefault();
+      openModal("termsModal");
+    };
+
+    document.querySelectorAll(".modal-close").forEach(btn => {
+      btn.onclick = () => closeModal(btn.dataset.close);
+    });
+
+    document.querySelectorAll(".modal-overlay").forEach(bg => {
+      bg.addEventListener("click", (e) => {
+        if (e.target.classList.contains("modal-overlay")) {
+          bg.style.display = "none";
+        }
+      });
+    });
+  </script>
 </body>
 </html>
