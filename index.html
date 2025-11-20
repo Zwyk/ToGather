@@ -113,6 +113,7 @@
     <div style="display:flex; flex-direction:column; gap:4px;">
       <button id="optBtn">Optimize meeting point</button>
       <button id="routeBtn">Show routes</button>
+      <button id="snapBtn">Snap meeting to safe place</button>
       <span id="error" style="color:#b00020; margin-top:4px;"></span>
     </div>
   </div>
@@ -155,6 +156,8 @@
     // Advanced marker for meeting point
     let meetingLatLng = null;
     let meetingMarker = null;
+
+    let placesService = null;  
 
     // Stored addresses & locations from PlaceAutocompleteElement
     let addr1Address = "";
@@ -205,6 +208,78 @@
       return candidates;
     }
 
+    function getSafeMeetingPoint(latLng) {
+      return new Promise((resolve) => {
+        if (!placesService) {
+          resolve(latLng);
+          return;
+        }
+
+        const request = {
+          location: latLng,
+          radius: 500, // meters around the computed point
+          type: [
+            "cafe",
+            "restaurant",
+            "parking",
+            "park",
+            "shopping_mall",
+            "transit_station",
+            "point_of_interest",
+          ],
+          rankBy: google.maps.places.RankBy.DISTANCE, // closest “good” place
+        };
+
+        placesService.nearbySearch(request, (results, status) => {
+          if (
+            status === google.maps.places.PlacesServiceStatus.OK &&
+            results &&
+            results.length > 0 &&
+            results[0].geometry &&
+            results[0].geometry.location
+          ) {
+            // Closest “nice” place
+            resolve(results[0].geometry.location);
+          } else {
+            // No good place found, keep the original point
+            resolve(latLng);
+          }
+        });
+      });
+    }
+
+    async function snapCurrentMeetingPoint() {
+      const errorSpan = document.getElementById("error");
+      errorSpan.textContent = "";
+
+      if (!meetingLatLng) {
+        errorSpan.textContent =
+          "Please choose a meeting point (optimize, click on map, or select an address) before snapping.";
+        return;
+      }
+
+      try {
+        const safeLatLng = await getSafeMeetingPoint(meetingLatLng);
+
+        if (!safeLatLng) {
+          errorSpan.textContent = "Could not find a safer place nearby.";
+          return;
+        }
+
+        // Move marker to the safe place
+        clearMeetingPoint();
+        setMeetingPoint(safeLatLng);
+        map.panTo(safeLatLng);
+
+        // Recompute all routes based on the new meeting point
+        await calcRoutes();
+      } catch (e) {
+        console.error("Error snapping meeting point:", e);
+        errorSpan.textContent = "Error while snapping meeting point.";
+      }
+    }
+
+
     function setupAutocompleteElement(elementId, onSelected) {
       const el = document.getElementById(elementId);
       if (!el) return null;
@@ -233,6 +308,7 @@
       });
 
       directionsService = new google.maps.DirectionsService();
+      placesService = new google.maps.places.PlacesService(map);
 
       renderer1 = new google.maps.DirectionsRenderer({
         map: map,
@@ -255,6 +331,10 @@
 
       document.getElementById("optBtn").addEventListener("click", () => {
         optimizeMeetingPoint();
+      });
+
+      document.getElementById("snapBtn").addEventListener("click", () => {
+        snapCurrentMeetingPoint();
       });
 
       // Setup new PlaceAutocompleteElement widgets
@@ -745,13 +825,16 @@
           return;
         }
 
-        // 5) Set the best candidate as the meeting point
-        clearMeetingPoint();
-        const bestLatLng = bestCandidate.point;
-        setMeetingPoint(bestLatLng);
-        map.panTo(bestLatLng);
+        // 5) Snap to a nearby safe place (cafe, parking, park, etc.)
+        const rawLatLng = bestCandidate.point;
+        const safeLatLng = await getSafeMeetingPoint(rawLatLng);
 
-        // 6) Show routes and comparisons
+        // 6) Set the safe point as the meeting point
+        clearMeetingPoint();
+        setMeetingPoint(safeLatLng);
+        map.panTo(safeLatLng);
+
+        // 7) Show routes and comparisons
         await calcRoutes();
       } catch (err) {
         console.error("Error during optimization:", err);
