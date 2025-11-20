@@ -178,7 +178,14 @@
 
     #map {
       flex: 1 1 auto;
-      min-height: 320px;
+      min-height: 40vh;   /* nicer on phones/tablets too */
+    }
+
+    /* On larger screens, make it really tall */
+    @media (min-width: 1024px) {
+      #map {
+        min-height: 70vh;
+      }
     }
 
     #error {
@@ -347,7 +354,7 @@
         "https://maps.googleapis.com/maps/api/js" +
         "?key=" + window.GOOGLE_MAPS_API_KEY +
         "&callback=initMap" +
-        "&libraries=marker,places" +
+        "&libraries=places" +
         "&v=weekly" +
         "&loading=async";
       script.async = true;
@@ -389,11 +396,11 @@
       },
       {
         label: "Person 2",
-        address: "3 Place Henri Dunant, Strasbourg, France",
+        address: "Parking Station, Rue de la Station, Strasbourg, France",
         mode: "WALKING",
       },
     ];
-    const INITIAL_DEST = "Instant Grimpe, Route Industrielle de la Hardt, Molsheim, France";
+    const INITIAL_DEST = "Auchan Drive Hautepierre, Strasbourg, France";
 
     // Dynamic people list
     let people = [];
@@ -403,6 +410,30 @@
     let optimizationStartTime = null;
     const ROUTE_PHASE_WEIGHT = 0.4; // 40% for alt routes, 60% for evaluation
 
+    // Very simple example styles – tweak as you like
+    const MAP_STYLES_LIGHT = [];  // default Google look (empty array)
+
+    const MAP_STYLES_DARK = [
+      { elementType: "geometry", stylers: [{ color: "#1f2933" }] },
+      { elementType: "labels.text.fill", stylers: [{ color: "#e5e7eb" }] },
+      { elementType: "labels.text.stroke", stylers: [{ color: "#111827" }] },
+      {
+        featureType: "road",
+        elementType: "geometry",
+        stylers: [{ color: "#374151" }]
+      },
+      {
+        featureType: "water",
+        elementType: "geometry",
+        stylers: [{ color: "#0f172a" }]
+      },
+      {
+        featureType: "poi",
+        elementType: "labels.icon",
+        stylers: [{ visibility: "off" }]
+      },
+    ];
+
     // ---- Theme handling ----
     function applyTheme(theme) {
       const body = document.body;
@@ -411,6 +442,12 @@
 
       const dark = theme === "dark";
       body.classList.toggle("dark", dark);
+
+      if (window.google && map) {
+        map.setOptions({
+          styles: dark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
+        });
+      }
 
       if (dark) {
         iconSpan.textContent = "☀️";
@@ -699,7 +736,7 @@
       meetingLatLng = latLng;
 
       if (!meetingMarker) {
-        meetingMarker = new google.maps.marker.AdvancedMarkerElement({
+        meetingMarker = new google.maps.Marker({
           map,
           position: latLng,
           title: "Meeting point",
@@ -719,7 +756,7 @@
     function clearMeetingPoint() {
       meetingLatLng = null;
       if (meetingMarker) {
-        meetingMarker.map = null;
+        meetingMarker.setMap(null);
         meetingMarker = null;
       }
       const hint = document.getElementById("meetingHint");
@@ -824,11 +861,15 @@
     function initMap() {
       initTheme();
 
+      const isDark = document.body.classList.contains("dark");
+
       map = new google.maps.Map(document.getElementById("map"), {
         zoom: 11,
-        center: { lat: 48.5734, lng: 7.7521 }, // Strasbourg-ish
-        mapId: window.GOOGLE_MAP_ID,
+        center: { lat: 48.5734, lng: 7.7521 },
+        //mapId: window.GOOGLE_MAP_ID,   // or your LIGHT mapId
+        styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
       });
+      ;
 
       directionsService = new google.maps.DirectionsService();
       rendererDest = new google.maps.DirectionsRenderer({
