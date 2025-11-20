@@ -40,10 +40,15 @@
 </head>
 <body>
   <div id="controls" style="display:flex; flex-wrap:wrap; gap:12px; padding:8px;">
-    <div style="display:flex; flex-direction:column; gap:4px; min-width:220px;">
+    <div style="display:flex; flex-direction:column; gap:4px; min-width:260px;">
       <label>
         Person 1:
-        <input id="addr1" type="text" placeholder="Person 1 address" value="10 rue Daniel Hirtz Strasbourg" />
+        <!-- New Places widget -->
+        <gmp-place-autocomplete
+          id="addr1"
+          placeholder="Person 1 address"
+          requested-language="en"
+        ></gmp-place-autocomplete>
       </label>
       <label>
         Mode 1:
@@ -56,10 +61,15 @@
       </label>
     </div>
 
-    <div style="display:flex; flex-direction:column; gap:4px; min-width:220px;">
+    <div style="display:flex; flex-direction:column; gap:4px; min-width:260px;">
       <label>
         Person 2:
-        <input id="addr2" type="text" placeholder="Person 2 address" value="3 place henri dunant strasbourg" />
+        <!-- New Places widget -->
+        <gmp-place-autocomplete
+          id="addr2"
+          placeholder="Person 2 address"
+          requested-language="en"
+        ></gmp-place-autocomplete>
       </label>
       <label>
         Mode 2:
@@ -75,15 +85,27 @@
     <div style="display:flex; flex-direction:column; gap:4px; min-width:260px;">
       <label>
         Meeting point (where they meet):
-        <input id="meeting" type="text" placeholder="Click on map or type an address" />
+        <!-- New Places widget -->
+        <gmp-place-autocomplete
+          id="meeting"
+          placeholder="Meeting address (or click on map)"
+          requested-language="en"
+        ></gmp-place-autocomplete>
       </label>
-      <small>Click on the map to set the meeting point, or type an address here.</small>
+      <small id="meetingHint">
+        Click on the map to set the meeting point, or choose an address here.
+      </small>
     </div>
 
     <div style="display:flex; flex-direction:column; gap:4px; min-width:260px;">
       <label>
         Destination (final place they go together):
-        <input id="destination" type="text" placeholder="Final destination address" value="Hueco zénith eckbolsheim" />
+        <!-- New Places widget -->
+        <gmp-place-autocomplete
+          id="destination"
+          placeholder="Final destination address"
+          requested-language="en"
+        ></gmp-place-autocomplete>
       </label>
       <small>Used by “Optimize meeting point” and comparisons.</small>
     </div>
@@ -102,7 +124,7 @@
   <!-- API key in config.js (window.GOOGLE_MAPS_API_KEY) -->
   <script src="config.js"></script>
 
-  <!-- Load Google Maps + Places -->
+  <!-- Load Google Maps (beta channel, Places+Marker libraries) -->
   <script>
     function loadGoogleMaps() {
       const key = window.GOOGLE_MAPS_API_KEY;
@@ -114,7 +136,7 @@
       script.src =
         "https://maps.googleapis.com/maps/api/js?key=" +
         key +
-        "&callback=initMap&loading=async&libraries=places";
+        "&callback=initMap&loading=async&v=beta&libraries=places,marker";
       script.async = true;
       script.defer = true;
       document.head.appendChild(script);
@@ -130,8 +152,19 @@
     let renderer2;
     let rendererDest; // Meeting -> Destination
 
+    // Advanced marker for meeting point
     let meetingLatLng = null;
     let meetingMarker = null;
+
+    // Stored addresses & locations from PlaceAutocompleteElement
+    let addr1Address = "";
+    let addr2Address = "";
+    let meetingAddress = "";
+    let destinationAddress = "";
+
+    let addr1Location = null;
+    let addr2Location = null;
+    let destinationLocation = null;
 
     const SPEEDS_KMH = {
       DRIVING: 50,
@@ -172,6 +205,26 @@
       return candidates;
     }
 
+    function setupAutocompleteElement(elementId, onSelected) {
+      const el = document.getElementById(elementId);
+      if (!el) return null;
+
+      // New Places widget event
+      el.addEventListener("gmp-select", async ({ placePrediction }) => {
+        try {
+          const place = placePrediction.toPlace();
+          await place.fetchFields({
+            fields: ["formattedAddress", "location"],
+          });
+          onSelected(place);
+        } catch (e) {
+          console.error("Error in autocomplete for", elementId, e);
+        }
+      });
+
+      return el;
+    }
+
     function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
         zoom: 6,
@@ -203,21 +256,33 @@
         optimizeMeetingPoint();
       });
 
-      // Autocomplete for all text fields
-      new google.maps.places.Autocomplete(document.getElementById("addr1"));
-      new google.maps.places.Autocomplete(document.getElementById("addr2"));
-      new google.maps.places.Autocomplete(document.getElementById("meeting"));
-      new google.maps.places.Autocomplete(document.getElementById("destination"));
+      // Setup new PlaceAutocompleteElement widgets
+      setupAutocompleteElement("addr1", (place) => {
+        addr1Address = place.formattedAddress || "";
+        addr1Location = place.location || null;
+      });
 
-      // If the meeting input changes manually, forget the clicked meeting point
-      const meetingInput = document.getElementById("meeting");
-      meetingInput.addEventListener("input", () => {
-        clearMeetingPoint();
+      setupAutocompleteElement("addr2", (place) => {
+        addr2Address = place.formattedAddress || "";
+        addr2Location = place.location || null;
+      });
+
+      setupAutocompleteElement("meeting", (place) => {
+        meetingAddress = place.formattedAddress || "";
+        if (place.location) {
+          setMeetingPoint(place.location);
+        }
+      });
+
+      setupAutocompleteElement("destination", (place) => {
+        destinationAddress = place.formattedAddress || "";
+        destinationLocation = place.location || null;
       });
 
       // Click on the map to choose the meeting point
       map.addListener("click", (e) => {
         setMeetingPoint(e.latLng);
+        meetingAddress = ""; // "point on map" overrides any typed address
       });
     }
 
@@ -228,36 +293,43 @@
       meetingLatLng = latLng;
 
       if (!meetingMarker) {
-        meetingMarker = new google.maps.Marker({
-          map: map,
+        meetingMarker = new google.maps.marker.AdvancedMarkerElement({
+          map,
           position: latLng,
           title: "Meeting point",
         });
       } else {
-        meetingMarker.setPosition(latLng);
+        meetingMarker.position = latLng;
       }
 
-      const meetingInput = document.getElementById("meeting");
       const lat = latLng.lat().toFixed(5);
       const lng = latLng.lng().toFixed(5);
-      meetingInput.value = `Point on map (${lat}, ${lng})`;
+      const hint = document.getElementById("meetingHint");
+      if (hint) {
+        hint.textContent = `Meeting point set on map at (${lat}, ${lng}).`;
+      }
     }
 
     function clearMeetingPoint() {
       meetingLatLng = null;
+      meetingAddress = "";
       if (meetingMarker) {
-        meetingMarker.setMap(null);
+        meetingMarker.map = null;
         meetingMarker = null;
+      }
+      const hint = document.getElementById("meetingHint");
+      if (hint) {
+        hint.textContent =
+          "Click on the map to set the meeting point, or choose an address here.";
       }
     }
 
     async function calcRoutes() {
-      const addr1 = document.getElementById("addr1").value.trim();
-      const addr2 = document.getElementById("addr2").value.trim();
+      const addr1 = addr1Address;
+      const addr2 = addr2Address;
       const mode1 = document.getElementById("mode1").value;
       const mode2 = document.getElementById("mode2").value;
-      const meetingText = document.getElementById("meeting").value.trim();
-      const destText = document.getElementById("destination").value.trim();
+      const destText = destinationAddress;
 
       const errorSpan = document.getElementById("error");
       const infoDiv = document.getElementById("info");
@@ -266,7 +338,8 @@
       infoDiv.textContent = "";
 
       if (!addr1 || !addr2) {
-        errorSpan.textContent = "Please enter both person addresses.";
+        errorSpan.textContent =
+          "Please select both person addresses from the suggestions.";
         return;
       }
 
@@ -274,17 +347,22 @@
       let meetingDestination;
       if (meetingLatLng) {
         meetingDestination = meetingLatLng;
-      } else if (meetingText) {
-        meetingDestination = meetingText;
+      } else if (meetingAddress) {
+        meetingDestination = meetingAddress;
       } else {
-        errorSpan.textContent = "Please choose a meeting point (click map or type it).";
+        errorSpan.textContent =
+          "Please choose a meeting point (click map or select an address).";
         return;
       }
 
       try {
+        const origin1 = addr1Location || addr1;
+        const origin2 = addr2Location || addr2;
+        const finalDest = destinationLocation || destText;
+
         // --- Person 1 → Meeting ---
         const req1 = {
-          origin: addr1,
+          origin: origin1,
           destination: meetingDestination,
           travelMode: google.maps.TravelMode[mode1],
         };
@@ -298,14 +376,20 @@
         if (leg1 && leg1.duration) {
           t1 = leg1.duration.value; // seconds
           text1 =
-            "Person 1 → Meeting (" + mode1.toLowerCase() + "):\n" +
-            "  Distance: " + (leg1.distance?.text || "?") + "\n" +
-            "  Duration: " + (leg1.duration?.text || "?") + "\n";
+            "Person 1 → Meeting (" +
+            mode1.toLowerCase() +
+            "):\n" +
+            "  Distance: " +
+            (leg1.distance?.text || "?") +
+            "\n" +
+            "  Duration: " +
+            (leg1.duration?.text || "?") +
+            "\n";
         }
 
         // --- Person 2 → Meeting ---
         const req2 = {
-          origin: addr2,
+          origin: origin2,
           destination: meetingDestination,
           travelMode: google.maps.TravelMode[mode2],
         };
@@ -319,27 +403,35 @@
         if (leg2 && leg2.duration) {
           t2 = leg2.duration.value; // seconds
           text2 =
-            "\nPerson 2 → Meeting (" + mode2.toLowerCase() + "):\n" +
-            "  Distance: " + (leg2.distance?.text || "?") + "\n" +
-            "  Duration: " + (leg2.duration?.text || "?") + "\n";
+            "\nPerson 2 → Meeting (" +
+            mode2.toLowerCase() +
+            "):\n" +
+            "  Distance: " +
+            (leg2.distance?.text || "?") +
+            "\n" +
+            "  Duration: " +
+            (leg2.duration?.text || "?") +
+            "\n";
         }
 
         infoDiv.textContent = text1 + text2;
 
-        let tMeetingTotal = null;
         if (t1 != null && t2 != null) {
           const diff = Math.abs(t1 - t2);
           const total = t1 + t2;
-          tMeetingTotal = total;
           const diffMin = Math.round(diff / 60);
           const totalMin = Math.round(total / 60);
           infoDiv.textContent +=
-            "\nTotal time to meeting (both): ~" + totalMin + " min" +
-            "\nDifference in duration at meeting: ~" + diffMin + " min";
+            "\nTotal time to meeting (both): ~" +
+            totalMin +
+            " min" +
+            "\nDifference in duration at meeting: ~" +
+            diffMin +
+            " min";
         }
 
         // --- Meeting → Destination (fastest mode from either person) ---
-        if (!destText) {
+        if (!destText && !destinationLocation) {
           infoDiv.textContent +=
             "\n\nNo final destination set: skipping Meeting → Destination leg and comparisons.";
           rendererDest.setDirections({ routes: [] }); // clear
@@ -353,11 +445,10 @@
           finalMode = mode2;
         }
 
-        const originMD = meetingLatLng || meetingText;
-
+        const originMD = meetingLatLng || meetingAddress;
         const reqDest = {
           origin: originMD,
-          destination: destText,
+          destination: finalDest,
           travelMode: google.maps.TravelMode[finalMode],
         };
         const resDest = await routePromise(reqDest);
@@ -369,9 +460,15 @@
         if (legDest && legDest.duration) {
           tMD = legDest.duration.value; // seconds
           infoDiv.textContent +=
-            "\n\nMeeting → Destination (" + finalMode.toLowerCase() + "):\n" +
-            "  Distance: " + (legDest.distance?.text || "?") + "\n" +
-            "  Duration: " + (legDest.duration?.text || "?") + "\n";
+            "\n\nMeeting → Destination (" +
+            finalMode.toLowerCase() +
+            "):\n" +
+            "  Distance: " +
+            (legDest.distance?.text || "?") +
+            "\n" +
+            "  Duration: " +
+            (legDest.duration?.text || "?") +
+            "\n";
         }
 
         // --- Total times to Destination via Meeting ---
@@ -388,9 +485,15 @@
 
           infoDiv.textContent +=
             "\nTotal time to destination via meeting:\n" +
-            "  Person 1: ~" + total1Min + " min\n" +
-            "  Person 2: ~" + total2Min + " min\n" +
-            "  Difference at destination: ~" + diffEndMin + " min";
+            "  Person 1: ~" +
+            total1Min +
+            " min\n" +
+            "  Person 2: ~" +
+            total2Min +
+            " min\n" +
+            "  Difference at destination: ~" +
+            diffEndMin +
+            " min";
 
           const groupViaMin = Math.round((total1 + total2) / 60);
           infoDiv.textContent +=
@@ -403,8 +506,8 @@
 
         try {
           const resDirect1 = await routePromise({
-            origin: addr1,
-            destination: destText,
+            origin: origin1,
+            destination: finalDest,
             travelMode: google.maps.TravelMode[mode1],
           });
           const legDirect1 = resDirect1.routes[0]?.legs?.[0];
@@ -417,8 +520,8 @@
 
         try {
           const resDirect2 = await routePromise({
-            origin: addr2,
-            destination: destText,
+            origin: origin2,
+            destination: finalDest,
             travelMode: google.maps.TravelMode[mode2],
           });
           const legDirect2 = resDirect2.routes[0]?.legs?.[0];
@@ -432,6 +535,13 @@
         if (direct1 != null || direct2 != null) {
           infoDiv.textContent += "\n\nComparison with going directly to destination:";
 
+          let total1, total2;
+          // they may still be null if no meeting leg
+          // but we've already guarded above for tMD/t1/t2
+
+          if (t1 != null && tMD != null) total1 = t1 + tMD;
+          if (t2 != null && tMD != null) total2 = t2 + tMD;
+
           let groupDirect = null;
           let groupVia = null;
 
@@ -441,8 +551,14 @@
             const delta1Min = total1Min - direct1Min;
             const sign1 = delta1Min > 0 ? "+" : "";
             infoDiv.textContent +=
-              "\n  Person 1: direct ~" + direct1Min + " min, " +
-              "via meeting ~" + total1Min + " min (" + sign1 + delta1Min + " min)";
+              "\n  Person 1: direct ~" +
+              direct1Min +
+              " min, via meeting ~" +
+              total1Min +
+              " min (" +
+              sign1 +
+              delta1Min +
+              " min)";
           }
 
           if (direct2 != null && total2 != null) {
@@ -451,13 +567,21 @@
             const delta2Min = total2Min - direct2Min;
             const sign2 = delta2Min > 0 ? "+" : "";
             infoDiv.textContent +=
-              "\n  Person 2: direct ~" + direct2Min + " min, " +
-              "via meeting ~" + total2Min + " min (" + sign2 + delta2Min + " min)";
+              "\n  Person 2: direct ~" +
+              direct2Min +
+              " min, via meeting ~" +
+              total2Min +
+              " min (" +
+              sign2 +
+              delta2Min +
+              " min)";
           }
 
           if (
-            direct1 != null && direct2 != null &&
-            total1 != null && total2 != null
+            direct1 != null &&
+            direct2 != null &&
+            total1 != null &&
+            total2 != null
           ) {
             groupDirect = direct1 + direct2;
             groupVia = total1 + total2;
@@ -466,25 +590,30 @@
             const deltaGroupMin = groupViaMin - groupDirectMin;
             const signG = deltaGroupMin > 0 ? "+" : "";
             infoDiv.textContent +=
-              "\n\nGroup total direct: ~" + groupDirectMin + " min" +
-              "\nGroup total via meeting: ~" + groupViaMin + " min" +
-              "\nGroup difference: " + signG + deltaGroupMin + " min";
+              "\n\nGroup total direct: ~" +
+              groupDirectMin +
+              " min" +
+              "\nGroup total via meeting: ~" +
+              groupViaMin +
+              " min" +
+              "\nGroup difference: " +
+              signG +
+              deltaGroupMin +
+              " min";
           }
         }
-
       } catch (err) {
         console.error("Error in calcRoutes:", err);
-        const errorSpan = document.getElementById("error");
         errorSpan.textContent = "Error while computing routes.";
       }
     }
 
     async function optimizeMeetingPoint() {
-      const addr1 = document.getElementById("addr1").value.trim();
-      const addr2 = document.getElementById("addr2").value.trim();
+      const addr1 = addr1Address;
+      const addr2 = addr2Address;
       const mode1 = document.getElementById("mode1").value;
       const mode2 = document.getElementById("mode2").value;
-      const destText = document.getElementById("destination").value.trim();
+      const destText = destinationAddress;
 
       const errorSpan = document.getElementById("error");
       const infoDiv = document.getElementById("info");
@@ -493,23 +622,26 @@
       infoDiv.textContent = "";
 
       if (!addr1 || !addr2) {
-        errorSpan.textContent = "Please enter both person addresses.";
+        errorSpan.textContent =
+          "Please select both person addresses from the suggestions.";
         return;
       }
-      if (!destText) {
-        errorSpan.textContent = "Please enter a final destination.";
+      if (!destText && !destinationLocation) {
+        errorSpan.textContent = "Please select a final destination.";
         return;
       }
 
-      const destination = destText; // string address; Directions will geocode it
+      const origin1 = addr1Location || addr1;
+      const origin2 = addr2Location || addr2;
+      const destination = destinationLocation || destText;
       const candidates = [];
-      const numPerPath = 6; // adjust if you want more/less precision vs API calls
+      const numPerPath = 6; // tweak for precision vs API cost
 
       try {
-        // --- 1) Person 1 -> Destination ---
+        // 1) Person 1 -> Destination
         try {
           const r1Dest = await routePromise({
-            origin: addr1,
+            origin: origin1,
             destination: destination,
             travelMode: google.maps.TravelMode[mode1],
           });
@@ -518,14 +650,14 @@
             candidates.push(...samplePath(route.overview_path, numPerPath));
           }
         } catch (e) {
-          console.warn("Route P1 -> Dest failed (still continuing):", e);
+          console.warn("Route P1 -> Dest failed (continuing):", e);
         }
 
-        // --- 2) Person 1 -> Person 2 ---
+        // 2) Person 1 -> Person 2
         try {
           const r1to2 = await routePromise({
-            origin: addr1,
-            destination: addr2,
+            origin: origin1,
+            destination: origin2,
             travelMode: google.maps.TravelMode[mode1],
           });
           const route = r1to2.routes[0];
@@ -533,13 +665,13 @@
             candidates.push(...samplePath(route.overview_path, numPerPath));
           }
         } catch (e) {
-          console.warn("Route P1 -> P2 failed (still continuing):", e);
+          console.warn("Route P1 -> P2 failed (continuing):", e);
         }
 
-        // --- 3) Person 2 -> Destination ---
+        // 3) Person 2 -> Destination
         try {
           const r2Dest = await routePromise({
-            origin: addr2,
+            origin: origin2,
             destination: destination,
             travelMode: google.maps.TravelMode[mode2],
           });
@@ -548,15 +680,16 @@
             candidates.push(...samplePath(route.overview_path, numPerPath));
           }
         } catch (e) {
-          console.warn("Route P2 -> Dest failed (still continuing):", e);
+          console.warn("Route P2 -> Dest failed (continuing):", e);
         }
 
         if (candidates.length === 0) {
-          errorSpan.textContent = "Could not generate candidate meeting points.";
+          errorSpan.textContent =
+            "Could not generate candidate meeting points.";
           return;
         }
 
-        // 4) Evaluate each candidate: Person 1 -> candidate, Person 2 -> candidate
+        // 4) Evaluate each candidate: P1 -> candidate, P2 -> candidate
         let bestCandidate = null;
         let bestTotal = Infinity;
         let bestDiff = Infinity;
@@ -565,7 +698,7 @@
           let res1;
           try {
             res1 = await routePromise({
-              origin: addr1,
+              origin: origin1,
               destination: point,
               travelMode: google.maps.TravelMode[mode1],
             });
@@ -581,7 +714,7 @@
           let res2;
           try {
             res2 = await routePromise({
-              origin: addr2,
+              origin: origin2,
               destination: point,
               travelMode: google.maps.TravelMode[mode2],
             });
@@ -597,7 +730,7 @@
           const total = t1 + t2;
           const diff = Math.abs(t1 - t2);
 
-          // primary: total time, secondary: fairness
+          // Primary: minimize total; secondary: fairness
           if (total < bestTotal || (total === bestTotal && diff < bestDiff)) {
             bestTotal = total;
             bestDiff = diff;
@@ -606,7 +739,8 @@
         }
 
         if (!bestCandidate) {
-          errorSpan.textContent = "Could not find a good meeting point among candidates.";
+          errorSpan.textContent =
+            "Could not find a good meeting point among candidates.";
           return;
         }
 
@@ -618,7 +752,6 @@
 
         // 6) Show routes and comparisons
         await calcRoutes();
-
       } catch (err) {
         console.error("Error during optimization:", err);
         errorSpan.textContent = "Error while optimizing the meeting point.";
