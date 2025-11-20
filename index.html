@@ -76,6 +76,12 @@
       color: var(--text-muted);
     }
 
+    #toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     #themeToggle {
       border-radius: 999px;
       border: 1px solid var(--border-subtle);
@@ -91,6 +97,21 @@
 
     #themeToggle span {
       font-size: 1rem;
+    }
+
+    #langSelect {
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: var(--chip-bg);
+      color: var(--text-main);
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    #langSelect:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
     }
 
     #control-grid {
@@ -170,6 +191,7 @@
       border: 1px solid var(--border-subtle);
       background: var(--bg-elevated);
       color: var(--text-main);
+      box-sizing: border-box;
     }
 
     select {
@@ -178,10 +200,9 @@
 
     #map {
       flex: 1 1 auto;
-      min-height: 40vh;   /* nicer on phones/tablets too */
+      min-height: 40vh;
     }
 
-    /* On larger screens, make it really tall */
     @media (min-width: 1024px) {
       #map {
         min-height: 70vh;
@@ -269,26 +290,32 @@
     <div id="toolbar">
       <div id="app-title">
         <h1>ToGather</h1>
-        <span>Find a fair meeting point for everyone</span>
+        <span id="subtitle">Find a fair meeting point for everyone</span>
       </div>
-      <button id="themeToggle" type="button">
-        <span id="themeToggleIcon">🌙</span>
-        <span id="themeToggleLabel">Dark mode</span>
-      </button>
+      <div id="toolbar-right">
+        <select id="langSelect" aria-label="Language">
+          <option value="en">EN</option>
+          <option value="fr">FR</option>
+        </select>
+        <button id="themeToggle" type="button">
+          <span id="themeToggleIcon">🌙</span>
+          <span id="themeToggleLabel">Dark mode</span>
+        </button>
+      </div>
     </div>
 
     <div id="control-grid">
       <div class="block" style="min-width: 260px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <strong>People</strong>
+          <strong id="peopleTitle">People</strong>
           <button id="addPersonBtn" type="button">Add person</button>
         </div>
-        <small class="field-hint">Each person has an address and a travel mode.</small>
+        <small id="peopleHint" class="field-hint">Each person has an address and a travel mode.</small>
         <div id="people-container" style="display:flex; flex-direction:column; gap:6px; margin-top:4px;"></div>
       </div>
 
       <div class="block">
-        <label for="meeting-input">Meeting point</label>
+        <label for="meeting-input" id="meetingLabel">Meeting point</label>
         <div class="inline-field">
           <input
             id="meeting-input"
@@ -312,7 +339,7 @@
       </div>
 
       <div class="block">
-        <label for="destination-input">Destination</label>
+        <label for="destination-input" id="destLabel">Destination</label>
         <input
           id="destination-input"
           type="text"
@@ -320,7 +347,7 @@
           style="width: 100%;"
           title="Start typing the final destination and pick a suggestion."
         />
-        <small class="field-hint">
+        <small id="destHint" class="field-hint">
           Everyone will go here after meeting. Pick a suggestion to confirm the address.
         </small>
 
@@ -332,7 +359,7 @@
           <div id="info"></div>
         </div>
 
-        <small class="field-hint">
+        <small id="tipText" class="field-hint">
           Tip: after typing an address, click a suggestion so the app can use it.
         </small>
       </div>
@@ -344,27 +371,251 @@
   <!-- API key + mapId in config.js -->
   <script src="config.js"></script>
   <script>
-    function loadGoogleMaps() {
-      const existingScript = document.getElementById("gmaps-script");
-      if (existingScript) return;
+    // ---- i18n ----
+    const I18N = {
+      en: {
+        subtitle: "Find a fair meeting point for everyone",
+        peopleTitle: "People",
+        peopleHint: "Each person has an address and a travel mode.",
+        meetingLabel: "Meeting point",
+        meetingPlaceholder: "Choose a meeting place or click on the map",
+        meetingTitle: "You can choose a meeting place yourself, or leave it empty and use Optimize.",
+        meetingHint: `You can either:
+• click on the map or choose an address here, or
+• leave it empty and click <strong>Optimize</strong> to let the app find a fair meeting point.`,
+        destLabel: "Destination",
+        destPlaceholder: "Final destination",
+        destTitle: "Start typing the final destination and pick a suggestion.",
+        destHint: "Everyone will go here after meeting. Pick a suggestion to confirm the address.",
+        routeBtn: "Show routes",
+        optBtn: "Optimize",
+        snapBtn: "Snap to safe",
+        tipText: "Tip: after typing an address, click a suggestion so the app can use it.",
+        detailsShow: "Show details",
+        detailsHide: "Hide details",
+        themeDark: "Dark mode",
+        themeLight: "Light mode",
+        footerMain: "© 2025 ToGather — Open-source tool to compute fair meeting points.",
+        privacyLink: "Privacy Notice",
+        termsLink: "Terms of Use",
+        contactLink: "Contact",
+        privacyTitle: "Privacy Notice",
+        privacyBody: `
+          <p>
+            ToGather does not collect or store any personally identifiable data.
+            Addresses you enter are processed only locally in your browser and sent
+            directly to Google Maps services to compute routes and place
+            suggestions. No information is transmitted to any server controlled by
+            the creator of this tool.
+          </p>
+          <p>
+            Since everything runs client-side, closing your browser window deletes
+            all input data. Your browser may keep cached Google Maps results as part
+            of normal web operation.
+          </p>
+          <p>
+            By using this tool, you also accept the Google Maps Platform
+            <a href="https://policies.google.com/privacy" target="_blank">Privacy Policy</a>.
+          </p>
+        `,
+        termsTitle: "Terms of Use",
+        termsBody: `
+          <p>
+            This tool is provided “as-is”, without warranty of any kind. Results
+            may be inaccurate due to real-world traffic variability, address
+            coverage, or API limitations. You remain responsible for verifying all
+            suggested routes and meeting locations.
+          </p>
+          <p>
+            This project is non-commercial and open-source. You are free to fork,
+            reuse, or modify the code under the MIT license (unless stated
+            otherwise in the GitHub repository).
+          </p>
+          <p>
+            The creator cannot be held liable for issues arising from inaccurate
+            routing or misuse of the tool.
+          </p>
+        `,
+        close: "Close",
+      },
+      fr: {
+        subtitle: "Trouvez un point de rendez-vous équitable pour tout le monde",
+        peopleTitle: "Personnes",
+        peopleHint: "Chaque personne a une adresse et un mode de déplacement.",
+        meetingLabel: "Point de rendez-vous",
+        meetingPlaceholder: "Choisissez un lieu ou cliquez sur la carte",
+        meetingTitle: "Vous pouvez choisir vous-même le lieu de rendez-vous ou laisser le bouton Optimiser le calculer.",
+        meetingHint: `Vous pouvez :
+• cliquer sur la carte ou choisir une adresse ici, ou
+• laisser le champ vide et cliquer sur <strong>Optimiser</strong> pour que l’appli propose un point de rendez-vous équitable.`,
+        destLabel: "Destination",
+        destPlaceholder: "Destination finale",
+        destTitle: "Commencez à taper la destination finale puis choisissez une suggestion.",
+        destHint: "Tout le monde ira ici après le rendez-vous. Choisissez une suggestion pour valider l’adresse.",
+        routeBtn: "Afficher les trajets",
+        optBtn: "Optimiser",
+        snapBtn: "Ajuster vers un lieu pratique",
+        tipText: "Astuce : après avoir saisi une adresse, cliquez sur une suggestion pour que l’appli puisse l’utiliser.",
+        detailsShow: "Afficher les détails",
+        detailsHide: "Masquer les détails",
+        themeDark: "Mode sombre",
+        themeLight: "Mode clair",
+        footerMain: "© 2025 ToGather — Outil open source pour trouver un point de rendez-vous équitable.",
+        privacyLink: "Confidentialité",
+        termsLink: "Conditions d’utilisation",
+        contactLink: "Contact",
+        privacyTitle: "Confidentialité",
+        privacyBody: `
+          <p>
+            ToGather ne collecte ni ne stocke aucune donnée personnelle identifiable.
+            Les adresses que vous saisissez sont traitées localement dans votre
+            navigateur et envoyées directement aux services Google Maps pour calculer
+            les itinéraires et les lieux suggérés. Aucune information n’est transmise
+            à un serveur contrôlé par le créateur de l’outil.
+          </p>
+          <p>
+            Comme tout fonctionne côté navigateur, fermer l’onglet suffit à effacer
+            les données saisies. Votre navigateur peut conserver un cache des
+            réponses Google Maps dans le cadre de son fonctionnement normal.
+          </p>
+          <p>
+            En utilisant cet outil, vous acceptez également la
+            <a href="https://policies.google.com/privacy" target="_blank">Politique de confidentialité</a>
+            de la plateforme Google Maps.
+          </p>
+        `,
+        termsTitle: "Conditions d’utilisation",
+        termsBody: `
+          <p>
+            Cet outil est fourni « tel quel », sans aucune garantie. Les résultats
+            peuvent être imprécis en raison du trafic réel, de la couverture des
+            adresses ou des limites de l’API. Vous restez responsable de la
+            vérification des trajets et des lieux de rendez-vous proposés.
+          </p>
+          <p>
+            Ce projet est non commercial et open source. Vous pouvez le forker,
+            le réutiliser ou le modifier sous licence MIT (sauf mention contraire
+            sur le dépôt GitHub).
+          </p>
+          <p>
+            Le créateur ne peut être tenu responsable d’un usage inapproprié ou de
+            conséquences liées à des trajets inexacts.
+          </p>
+        `,
+        close: "Fermer",
+      },
+    };
 
-      const script = document.createElement("script");
-      script.id = "gmaps-script";
-      script.src =
-        "https://maps.googleapis.com/maps/api/js" +
-        "?key=" + window.GOOGLE_MAPS_API_KEY +
-        "&callback=initMap" +
-        "&libraries=places" +
-        "&v=weekly" +
-        "&loading=async";
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
+    let currentLang = "en";
+
+    function applyLanguage(lang) {
+      currentLang = I18N[lang] ? lang : "en";
+      const dict = I18N[currentLang];
+
+      document.documentElement.lang = currentLang;
+
+      const subtitle = document.getElementById("subtitle");
+      if (subtitle) subtitle.textContent = dict.subtitle;
+
+      const peopleTitle = document.getElementById("peopleTitle");
+      if (peopleTitle) peopleTitle.textContent = dict.peopleTitle;
+
+      const peopleHint = document.getElementById("peopleHint");
+      if (peopleHint) peopleHint.textContent = dict.peopleHint;
+
+      const meetingLabel = document.getElementById("meetingLabel");
+      if (meetingLabel) meetingLabel.textContent = dict.meetingLabel;
+
+      const meetingInput = document.getElementById("meeting-input");
+      if (meetingInput) {
+        meetingInput.placeholder = dict.meetingPlaceholder;
+        meetingInput.title = dict.meetingTitle;
+      }
+
+      const meetingHint = document.getElementById("meetingHint");
+      if (meetingHint) meetingHint.innerHTML = dict.meetingHint;
+
+      const destLabel = document.getElementById("destLabel");
+      if (destLabel) destLabel.textContent = dict.destLabel;
+
+      const destInput = document.getElementById("destination-input");
+      if (destInput) {
+        destInput.placeholder = dict.destPlaceholder;
+        destInput.title = dict.destTitle;
+      }
+
+      const destHint = document.getElementById("destHint");
+      if (destHint) destHint.textContent = dict.destHint;
+
+      const routeBtn = document.getElementById("routeBtn");
+      if (routeBtn) routeBtn.textContent = dict.routeBtn;
+
+      const optBtn = document.getElementById("optBtn");
+      if (optBtn) optBtn.textContent = "⚖️ " + dict.optBtn;
+
+      const snapBtn = document.getElementById("snapBtn");
+      if (snapBtn) snapBtn.textContent = "📍 " + dict.snapBtn;
+
+      const tipText = document.getElementById("tipText");
+      if (tipText) tipText.textContent = dict.tipText;
+
+      const detailsBtn = document.getElementById("toggleDetailsBtn");
+      if (detailsBtn) {
+        if (detailsBtn.style.display === "none" || !detailsBtn.style.display) {
+          detailsBtn.textContent = dict.detailsShow;
+        } else {
+          detailsBtn.textContent = dict.detailsHide;
+        }
+      }
+
+      const footerMain = document.getElementById("footerMain");
+      if (footerMain) footerMain.textContent = dict.footerMain;
+
+      const privacyLink = document.getElementById("openPrivacy");
+      if (privacyLink) privacyLink.textContent = dict.privacyLink;
+
+      const termsLink = document.getElementById("openTerms");
+      if (termsLink) termsLink.textContent = dict.termsLink;
+
+      const contactLink = document.getElementById("contactLink");
+      if (contactLink) contactLink.textContent = dict.contactLink;
+
+      const themeLabel = document.getElementById("themeToggleLabel");
+      if (themeLabel) {
+        const isDark = document.body.classList.contains("dark");
+        themeLabel.textContent = isDark ? dict.themeLight : dict.themeDark;
+      }
+
+      const privacyTitle = document.getElementById("privacyTitle");
+      if (privacyTitle) privacyTitle.textContent = dict.privacyTitle;
+      const privacyBody = document.getElementById("privacyBody");
+      if (privacyBody) privacyBody.innerHTML = dict.privacyBody;
+      const privacyClose = document.getElementById("privacyCloseBtn");
+      if (privacyClose) privacyClose.textContent = dict.close;
+
+      const termsTitle = document.getElementById("termsTitle");
+      if (termsTitle) termsTitle.textContent = dict.termsTitle;
+      const termsBody = document.getElementById("termsBody");
+      if (termsBody) termsBody.innerHTML = dict.termsBody;
+      const termsClose = document.getElementById("termsCloseBtn");
+      if (termsClose) termsClose.textContent = dict.close;
     }
-    loadGoogleMaps();
-  </script>
 
-  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const select = document.getElementById("langSelect");
+      const saved = localStorage.getItem("tg_lang");
+      let lang = saved || (navigator.language && navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en");
+      if (select) {
+        select.value = lang;
+        select.addEventListener("change", () => {
+          const newLang = select.value;
+          localStorage.setItem("tg_lang", newLang);
+          applyLanguage(newLang);
+        });
+      }
+      applyLanguage(lang);
+    });
+
     // ---- Global state ----
     let map;
     let directionsService;
@@ -410,8 +661,8 @@
     let optimizationStartTime = null;
     const ROUTE_PHASE_WEIGHT = 0.4; // 40% for alt routes, 60% for evaluation
 
-    // Very simple example styles – tweak as you like
-    const MAP_STYLES_LIGHT = [];  // default Google look (empty array)
+    // Map styles
+    const MAP_STYLES_LIGHT = [];  // default Google look
 
     const MAP_STYLES_DARK = [
       { elementType: "geometry", stylers: [{ color: "#1f2933" }] },
@@ -449,12 +700,14 @@
         });
       }
 
+      const dict = I18N[currentLang] || I18N.en;
+
       if (dark) {
-        iconSpan.textContent = "☀️";
-        labelSpan.textContent = "Light mode";
+        if (iconSpan) iconSpan.textContent = "☀️";
+        if (labelSpan) labelSpan.textContent = dict.themeLight;
       } else {
-        iconSpan.textContent = "🌙";
-        labelSpan.textContent = "Dark mode";
+        if (iconSpan) iconSpan.textContent = "🌙";
+        if (labelSpan) labelSpan.textContent = dict.themeDark;
       }
     }
 
@@ -847,9 +1100,11 @@
 
       infoDiv.textContent = text || "";
 
+      const dict = I18N[currentLang] || I18N.en;
+
       if (text && text.trim()) {
         btn.style.display = "inline-block";
-        btn.textContent = "Show details";
+        btn.textContent = dict.detailsShow;
         infoDiv.style.display = "none";
       } else {
         btn.style.display = "none";
@@ -866,10 +1121,8 @@
       map = new google.maps.Map(document.getElementById("map"), {
         zoom: 11,
         center: { lat: 48.5734, lng: 7.7521 },
-        //mapId: window.GOOGLE_MAP_ID,   // or your LIGHT mapId
         styles: isDark ? MAP_STYLES_DARK : MAP_STYLES_LIGHT,
       });
-      ;
 
       directionsService = new google.maps.DirectionsService();
       rendererDest = new google.maps.DirectionsRenderer({
@@ -900,12 +1153,14 @@
         const btn = document.getElementById("toggleDetailsBtn");
         const isVisible = infoDiv.style.display !== "none";
 
+        const dict = I18N[currentLang] || I18N.en;
+
         if (isVisible) {
           infoDiv.style.display = "none";
-          btn.textContent = "Show details";
+          btn.textContent = dict.detailsShow;
         } else {
           infoDiv.style.display = "block";
-          btn.textContent = "Hide details";
+          btn.textContent = dict.detailsHide;
         }
       });
 
@@ -1366,13 +1621,17 @@
     margin-top: 10px;
     text-align: center;
   ">
-    <div style="margin-bottom:6px;">
+    <div id="footerMain" style="margin-bottom:6px;">
       © 2025 ToGather — Open-source tool to compute fair meeting points.
     </div>
 
     <a href="#" id="openPrivacy" style="margin:0 8px; color: var(--accent); text-decoration:none;">Privacy Notice</a>
     ·
     <a href="#" id="openTerms" style="margin:0 8px; color: var(--accent); text-decoration:none;">Terms of Use</a>
+    ·
+    <a href="mailto:erb.fel@gmail.com" id="contactLink" style="margin:0 8px; color: var(--accent); text-decoration:none;">
+      Contact
+    </a>
     ·
     <a href="https://github.com/Zwyk/ToGather" target="_blank" style="margin:0 8px; color: var(--accent); text-decoration:none;">
       GitHub
@@ -1423,47 +1682,51 @@
   <!-- Privacy Modal -->
   <div id="privacyModal" class="modal-overlay">
     <div class="modal-box">
-      <h2>Privacy Notice</h2>
-      <p>
-        ToGather does not collect or store any personally identifiable data.
-        Addresses you enter are processed only locally in your browser and sent
-        directly to Google Maps services to compute routes and place
-        suggestions. No information is transmitted to any server controlled by
-        the creator of this tool.
-      </p>
-      <p>
-        Since everything runs client-side, closing your browser window deletes
-        all input data. Your browser may keep cached Google Maps results as part
-        of normal web operation.
-      </p>
-      <p>
-        By using this tool, you also accept the Google Maps Platform
-        <a href="https://policies.google.com/privacy" target="_blank">Privacy Policy</a>.
-      </p>
-      <button class="modal-close" data-close="privacyModal">Close</button>
+      <h2 id="privacyTitle">Privacy Notice</h2>
+      <div id="privacyBody">
+        <p>
+          ToGather does not collect or store any personally identifiable data.
+          Addresses you enter are processed only locally in your browser and sent
+          directly to Google Maps services to compute routes and place
+          suggestions. No information is transmitted to any server controlled by
+          the creator of this tool.
+        </p>
+        <p>
+          Since everything runs client-side, closing your browser window deletes
+          all input data. Your browser may keep cached Google Maps results as part
+          of normal web operation.
+        </p>
+        <p>
+          By using this tool, you also accept the Google Maps Platform
+          <a href="https://policies.google.com/privacy" target="_blank">Privacy Policy</a>.
+        </p>
+      </div>
+      <button class="modal-close" data-close="privacyModal" id="privacyCloseBtn">Close</button>
     </div>
   </div>
 
   <!-- Terms Modal -->
   <div id="termsModal" class="modal-overlay">
     <div class="modal-box">
-      <h2>Terms of Use</h2>
-      <p>
-        This tool is provided “as-is”, without warranty of any kind. Results
-        may be inaccurate due to real-world traffic variability, address
-        coverage, or API limitations. You remain responsible for verifying all
-        suggested routes and meeting locations.
-      </p>
-      <p>
-        This project is non-commercial and open-source. You are free to fork,
-        reuse, or modify the code under the MIT license (unless stated
-        otherwise in the GitHub repository).
-      </p>
-      <p>
-        The creator cannot be held liable for issues arising from inaccurate
-        routing or misuse of the tool.
-      </p>
-      <button class="modal-close" data-close="termsModal">Close</button>
+      <h2 id="termsTitle">Terms of Use</h2>
+      <div id="termsBody">
+        <p>
+          This tool is provided “as-is”, without warranty of any kind. Results
+          may be inaccurate due to real-world traffic variability, address
+          coverage, or API limitations. You remain responsible for verifying all
+          suggested routes and meeting locations.
+        </p>
+        <p>
+          This project is non-commercial and open-source. You are free to fork,
+          reuse, or modify the code under the MIT license (unless stated
+          otherwise in the GitHub repository).
+        </p>
+        <p>
+          The creator cannot be held liable for issues arising from inaccurate
+          routing or misuse of the tool.
+        </p>
+      </div>
+      <button class="modal-close" data-close="termsModal" id="termsCloseBtn">Close</button>
     </div>
   </div>
 
@@ -1496,6 +1759,27 @@
         }
       });
     });
+  </script>
+
+  <script>
+    function loadGoogleMaps() {
+      const existingScript = document.getElementById("gmaps-script");
+      if (existingScript) return;
+
+      const script = document.createElement("script");
+      script.id = "gmaps-script";
+      script.src =
+        "https://maps.googleapis.com/maps/api/js" +
+        "?key=" + window.GOOGLE_MAPS_API_KEY +
+        "&callback=initMap" +
+        "&libraries=places" +
+        "&v=weekly" +
+        "&loading=async";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+    loadGoogleMaps();
   </script>
 </body>
 </html>
