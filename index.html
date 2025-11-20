@@ -210,42 +210,62 @@
 
     function getSafeMeetingPoint(latLng) {
       return new Promise((resolve) => {
-        if (!placesService) {
+        if (!placesService || !latLng) {
           resolve(latLng);
           return;
         }
 
+        // We request generic POIs, then filter to “safe-ish” ones ourselves
         const request = {
           location: latLng,
-          type: [
-            "cafe",
-            "restaurant",
-            "parking",
-            "park",
-            "shopping_mall",
-            "transit_station",
-            "point_of_interest",
-          ],
-          rankBy: google.maps.places.RankBy.DISTANCE, // closest “good” place
+          rankBy: google.maps.places.RankBy.DISTANCE, // ✅ no radius here
+          type: "point_of_interest",                  // ✅ single string
         };
+
+        const preferredTypes = [
+          "cafe",
+          "restaurant",
+          "parking",
+          "park",
+          "shopping_mall",
+          "transit_station",
+          "train_station",
+          "bus_station",
+          "subway_station",
+        ];
 
         placesService.nearbySearch(request, (results, status) => {
           if (
-            status === google.maps.places.PlacesServiceStatus.OK &&
-            results &&
-            results.length > 0 &&
-            results[0].geometry &&
-            results[0].geometry.location
+            status !== google.maps.places.PlacesServiceStatus.OK ||
+            !results ||
+            results.length === 0
           ) {
-            // Closest “nice” place
-            resolve(results[0].geometry.location);
+            // No better place found → keep original point
+            resolve(latLng);
+            return;
+          }
+
+          // Pick the closest result that matches one of our “safe” types
+          let chosen = results[0];
+          for (const place of results) {
+            if (
+              place.types &&
+              place.types.some((t) => preferredTypes.includes(t))
+            ) {
+              chosen = place;
+              break;
+            }
+          }
+
+          if (chosen.geometry && chosen.geometry.location) {
+            resolve(chosen.geometry.location);
           } else {
-            // No good place found, keep the original point
             resolve(latLng);
           }
         });
       });
     }
+
 
     async function snapCurrentMeetingPoint() {
       const errorSpan = document.getElementById("error");
