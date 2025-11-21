@@ -24,19 +24,43 @@ const SPEEDS_KMH = {
 const COLORS = ["#1a73e8", "#e91e63", "#f57c00", "#6a1b9a", "#388e3c", "#00897b"];
 
 // Initial test scenario
-const INITIAL_PERSONS = [
-  {
-    label: "Person 1",
-    address: "10 Rue Daniel Hirtz, Strasbourg, France",
-    mode: "DRIVING",
-  },
-  {
-    label: "Person 2",
-    address: "Parking Station, Rue de la Station, Strasbourg, France",
-    mode: "WALKING",
-  },
-];
-const INITIAL_DEST = "Auchan Drive Hautepierre, Strasbourg, France";
+const IS_DEV = ["localhost", "127.0.0.1"].includes(location.hostname);
+
+// Only use your real test data locally
+const INITIAL_PERSONS = IS_DEV
+  ? [
+      {
+        label: "Person 1",
+        address: "10 Rue Daniel Hirtz, Strasbourg, France",
+        mode: "DRIVING",
+      },
+      {
+        label: "Person 2",
+        address: "Parking Station, Rue de la Station, Strasbourg, France",
+        mode: "WALKING",
+      },
+      {
+        lavel: "Person 3",
+        address: "3 place Henri Dunant, Strasbourg, France",
+        mode: "WALKING",
+      }
+    ]
+  : [
+      {
+        label: "Person 1",
+        address: "Rivetoile, Strasbourg, France",
+        mode: "DRIVING",
+      },
+      {
+        label: "Person 2",
+        address: "Gare Centrale, Strasbourg, France",
+        mode: "WALKING",
+      },
+  ]; // no pre-filled people on GitHub Pages
+
+const INITIAL_DEST = IS_DEV
+  ? "Auchan Drive Hautepierre, Strasbourg, France"
+  : "Piscine du Wacken, Strasbourg, France"; // empty in production (or some generic city name)
 
 // Dynamic people list
 let people = [];
