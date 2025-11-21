@@ -187,12 +187,10 @@ export function applyLanguage(lang) {
     if (tipText) tipText.textContent = dict.tipText;
 
     const detailsBtn = document.getElementById("toggleDetailsBtn");
-    if (detailsBtn) {
-    if (detailsBtn.style.display === "none" || !detailsBtn.style.display) {
-        detailsBtn.textContent = dict.detailsShow;
-    } else {
-        detailsBtn.textContent = dict.detailsHide;
-    }
+    const infoDiv    = document.getElementById("info");
+    if (detailsBtn && infoDiv) {
+      const isVisible = infoDiv.style.display !== "none" && infoDiv.textContent.trim() !== "";
+      detailsBtn.textContent = isVisible ? dict.detailsHide : dict.detailsShow;
     }
 
     const footerMain = document.getElementById("footerMain");

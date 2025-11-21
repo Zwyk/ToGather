@@ -124,6 +124,11 @@
       #control-grid {
         grid-template-columns: 1fr;
       }
+      .field-hint {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     }
 
     .block {
@@ -215,8 +220,10 @@
     }
 
     .field-hint {
-      font-size: 0.8em;
+      font-size: 0.75rem;
       color: var(--text-muted);
+      margin-top: 2px;
+      line-height: 1.2;
     }
 
     .validated-input {
@@ -277,7 +284,48 @@
       color: #e5e7eb;
       z-index: 9999;
     }
-  </style>
+
+    /* Base layout: map fills remaining height */
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    #controlsAndDetails {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* When collapsed: hide controls except a thin bar */
+    body.controls-collapsed #control-grid {
+      display: none;
+    }
+
+    body.controls-collapsed #map {
+      min-height: calc(100vh - 60px); /* header/footer */
+    }
+
+    .suggestions-list {
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .suggestion-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: var(--chip-bg);
+      margin: 2px;
+      cursor: pointer;
+    }
+
+    .suggestion-pill.active {
+      border-color: var(--accent);
+    }
+      </style>
 </head>
 <body>
   <!-- Loading overlay for optimization -->
@@ -291,6 +339,9 @@
         <h1>ToGather</h1>
         <span id="subtitle">Find a fair meeting point for everyone</span>
       </div>
+      <button id="collapseControlsBtn" class="chip-btn" title="Collapse/expand controls">
+        <span id="collapseArrow">⬆️</span>
+      </button>
       <div id="toolbar-right">
         <select id="langSelect" aria-label="Language">
           <option value="en">EN</option>
@@ -335,6 +386,7 @@
           • click on the map or choose an address here, or
           • leave it empty and click <strong>Optimize</strong> to let the app find a fair meeting point.
         </small>
+        <div id="meetingSuggestions" class="suggestions-list"></div>
       </div>
 
       <div class="block">

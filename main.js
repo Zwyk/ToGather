@@ -53,3 +53,20 @@ function loadGoogleMaps() {
   script.defer = true;
   document.head.appendChild(script);
 }
+
+function initControlsCollapse() {
+  const btn = document.getElementById("collapseControlsBtn");
+  const arrow = document.getElementById("collapseArrow");
+  if (!btn || !arrow) return;
+
+  btn.addEventListener("click", () => {
+    const collapsed = document.body.classList.toggle("controls-collapsed");
+    arrow.textContent = collapsed ? "⬇️" : "⬆️";
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initLanguagePicker();
+  initModals();
+  initControlsCollapse();
+});
