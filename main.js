@@ -1,5 +1,5 @@
 // main.js
-import { applyLanguage, initLanguage } from "./i18n.js";
+import { I18N, applyLanguage, initLanguage } from "./i18n.js";
 import { initMap } from "./mapLogic.js";
 import { initModals } from "./modals.js";
 
@@ -30,3 +30,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Expose initMap globally for Google Maps callback
 window.initMap = initMap;
+
+// Now that window.initMap exists, load the Google Maps script
+loadGoogleMaps();
+
+function loadGoogleMaps() {
+  // Avoid injecting the script twice
+  const existingScript = document.getElementById("gmaps-script");
+  if (existingScript) return;
+
+  const script = document.createElement("script");
+  script.id = "gmaps-script";
+  script.src =
+    "https://maps.googleapis.com/maps/api/js" +
+    "?key=" + window.GOOGLE_MAPS_API_KEY +
+    "&callback=initMap" +
+    "&libraries=places" +
+    "&v=weekly" +
+    "&loading=async";
+
+  script.async = true;
+  script.defer = true;
+  document.head.appendChild(script);
+}
