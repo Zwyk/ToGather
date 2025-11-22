@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <title>ToGather – Fair Meeting Point</title>
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="apple-touch-icon" href="assets/icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
   <style>
     :root {
       --bg: #f3f4f6;
@@ -325,7 +328,19 @@
     .suggestion-pill.active {
       border-color: var(--accent);
     }
-      </style>
+
+    .app-logo-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .app-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+    }
+  </style>
 </head>
 <body>
   <!-- Loading overlay for optimization -->
@@ -336,7 +351,10 @@
   <div id="controls">
     <div id="toolbar">
       <div id="app-title">
-        <h1>ToGather</h1>
+        <div class="app-logo-title">
+          <img src="assets/icon.png" alt="Logo" class="app-logo">
+          <h1>ToGather</h1>
+        </div>
         <span id="subtitle">Find a fair meeting point for everyone</span>
       </div>
       <button id="collapseControlsBtn" class="chip-btn" title="Collapse/expand controls">

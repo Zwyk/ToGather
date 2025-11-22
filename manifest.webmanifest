@@ -1,0 +1,15 @@
+{
+  "name": "ToGather",
+  "short_name": "ToGather",
+  "icons": [
+    {
+      "src": "assets/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111",
+  "theme_color": "#111"
+}
