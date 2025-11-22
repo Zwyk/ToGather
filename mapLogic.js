@@ -6,6 +6,10 @@ let map;
 let directionsService;
 let rendererDest; // Meeting -> Destination
 let personRenderers = [];
+let personMarkers = [];
+let destinationMarker = null;
+let meetingPulseInterval = null;
+let meetingIconScale = 10;
 
 let meetingLatLng = null;
 let meetingMarker = null;
@@ -431,11 +435,27 @@ async function snapCurrentMeetingPoint() {
     await calcRoutes();
 }
 
+function getMeetingIcon(scale = 10) {
+    return {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: "#facc15", // amber, readable in dark & light
+        fillOpacity: 1,
+        scale,
+        strokeColor: "#111827",
+        strokeWeight: 2,
+    };
+}
+
+function getPulsingPinIcon(scale = 1) {
+    return {
+        url: "assets/pin.svg",        // <-- your pin.svg location
+        scaledSize: new google.maps.Size(40 * scale, 40 * scale),
+        anchor: new google.maps.Point(20 * scale, 40 * scale), // bottom center
+    };
+}
+
 function setMeetingPoint(latLng) {
-    if (!latLng) {
-        console.warn("setMeetingPoint called with null/undefined");
-        return;
-    }
+    if (!latLng) return;
 
     meetingLatLng = latLng;
 
@@ -444,29 +464,52 @@ function setMeetingPoint(latLng) {
             map,
             position: latLng,
             title: "Meeting point",
+            icon: getPulsingPinIcon(1),
+            zIndex: 1000,
         });
     } else {
-        meetingMarker.position = latLng;
+        meetingMarker.setPosition(latLng);
     }
 
-    const lat = latLng.lat().toFixed(5);
-    const lng = latLng.lng().toFixed(5);
-    const hint = document.getElementById("meetingHint");
-    if (hint) {
-        hint.textContent = `Meeting point: (${lat}, ${lng}).`;
+    // restart pulsing animation
+    if (meetingPulseInterval) {
+        clearInterval(meetingPulseInterval);
+        meetingPulseInterval = null;
     }
+
+    let pulse = 1;
+    let growing = true;
+
+    meetingPulseInterval = setInterval(() => {
+        if (!meetingMarker) return;
+
+        // pulse between 1.0x and 1.2x
+        if (growing) pulse += 0.05;
+        else pulse -= 0.05;
+
+        if (pulse >= 1.2) growing = false;
+        if (pulse <= 1.0) growing = true;
+
+        meetingMarker.setIcon(getPulsingPinIcon(pulse));
+    }, 100);
 }
 
 function clearMeetingPoint() {
     meetingLatLng = null;
+
+    if (meetingPulseInterval) {
+        clearInterval(meetingPulseInterval);
+        meetingPulseInterval = null;
+    }
+
     if (meetingMarker) {
         meetingMarker.setMap(null);
         meetingMarker = null;
     }
+
     const hint = document.getElementById("meetingHint");
     if (hint) {
-        hint.textContent =
-            "Click on the map to set the meeting point, or choose an address here.";
+        hint.textContent = "Click on the map to set the meeting point, or choose an address here.";
     }
 }
 
@@ -610,6 +653,7 @@ export function initMap() {
     directionsService = new google.maps.DirectionsService();
     rendererDest = new google.maps.DirectionsRenderer({
         map,
+        suppressMarkers: true, // we'll draw our own markers
         polylineOptions: { strokeColor: "#00b894" },
     });
 
@@ -730,6 +774,14 @@ async function calcRoutes() {
     personRenderers.forEach((r) => r.setMap(null));
     personRenderers = [];
 
+    personMarkers.forEach((m) => m.setMap(null));
+    personMarkers = [];
+
+    if (destinationMarker) {
+        destinationMarker.setMap(null);
+        destinationMarker = null;
+    }
+
     let text = "";
     const personResults = [];
     let bounds = new google.maps.LatLngBounds();
@@ -757,6 +809,7 @@ async function calcRoutes() {
 
             const renderer = new google.maps.DirectionsRenderer({
                 map,
+                suppressMarkers: true, // we draw our own person markers
                 polylineOptions: { strokeColor: COLORS[idx % COLORS.length] },
             });
             renderer.setDirections(res);
@@ -765,10 +818,45 @@ async function calcRoutes() {
             const leg = res.routes[0]?.legs?.[0];
             if (!leg || !leg.duration) continue;
 
-            if (leg.start_location) bounds.extend(leg.start_location);
+            if (leg.start_location) {
+                bounds.extend(leg.start_location);
+
+                // Choose an icon file based on the person's travel mode
+                const modeIconMap = {
+                    DRIVING: "car",
+                    WALKING: "walk",
+                    BICYCLING: "bike",
+                    TRANSIT: "bus",
+                };
+
+                const modeKey = modeIconMap[mode] || "pin";   // uses the correct mode
+                const iconUrl = `assets/${modeKey}.svg`;      // or `icons/person_${modeKey}.svg` if you prefer
+
+                const personMarker = new google.maps.Marker({
+                    map,
+                    position: leg.start_location,
+                    title: displayName,
+                    icon: {
+                        url: iconUrl,
+                        scaledSize: new google.maps.Size(42, 42),
+                        anchor: new google.maps.Point(21, 21),
+                        labelOrigin: new google.maps.Point(21, 0),
+                    },
+                    label: {
+                        text: String(idx + 1), // number
+                        color: "#ffffff",
+                        fontWeight: "bold",
+                        fontSize: "16px",
+                    },
+                    zIndex: 900,
+                });
+                personMarkers.push(personMarker);
+
+            }
             if (leg.end_location) bounds.extend(leg.end_location);
 
             const t = leg.duration.value;
+
             const dText = leg.distance?.text || "?";
             const tText = leg.duration?.text || "?";
 
@@ -825,6 +913,24 @@ async function calcRoutes() {
 
             if (legDest.start_location) bounds.extend(legDest.start_location);
             if (legDest.end_location) bounds.extend(legDest.end_location);
+
+            // Destination marker (single shared marker)
+            if (destinationMarker) {
+                destinationMarker.setMap(null);
+            }
+            if (legDest.end_location) {
+                destinationMarker = new google.maps.Marker({
+                map,
+                position: legDest.end_location,
+                title: "Destination",
+                icon: {
+                    url: "assets/flag.svg",
+                    scaledSize: new google.maps.Size(42, 42),
+                    anchor: new google.maps.Point(12, 33), // tweak if needed
+                },
+                zIndex: 1000,
+                });
+            }
         }
 
         // Totals to meeting
@@ -964,7 +1070,7 @@ async function optimizeMeetingPoint() {
         for (const person of people) {
             const originAddress = person.address || person.defaultAddress || "";
             const origin = person.location || originAddress;
-            const mode = person.modeSelect.value;
+            const mode = person.modeSelect?.value || "DRIVING";
 
             if (!origin) {
                 routeStepsDone++;
